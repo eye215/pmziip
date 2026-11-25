@@ -1,0 +1,16 @@
+{
+  "timeZone": "Asia/Seoul",
+  "runtimeVersion": "V8",
+  "exceptionLogging": "STACKDRIVER",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      { "userSymbol": "AnalyticsData", "serviceId": "analyticsdata", "version": "v1beta" }
+    ]
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/analytics.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/script.scriptapp"
+  ],
+  "webapp": { "executeAs": "USER_DEPLOYING", "access": "MYSELF" }
+}
