@@ -4,6 +4,8 @@
 
 ## 현재 범위
 
+**Phase 0 구현 및 자동 인수 완료. PR #1은 미병합·미배포.** 후속 기능은 아래 인수 상태와 구분한다.
+
 Phase 0: 명세 인수, 재현 가능한 Next.js 실행 기반, 고객사/프로젝트 합성 fixture, GA v1.2 이벤트 상수 계약, 시간대 월 처리, 전체 요구사항 추적표, 자동 검사와 CI. 코드 구현과 운영 연결은 구분한다.
 
 기존 ZIP은 명세·프로토타입만 있는 상태였다. 기존 데이터/앱을 덮어쓰거나 변환하지 않는다. Apps Script는 정적 검토만 했고, 원본·공유 ID·실제 성과값을 새 앱에 복사하지 않는다.
@@ -13,7 +15,7 @@ Phase 0: 명세 인수, 재현 가능한 Next.js 실행 기반, 고객사/프로
 - 로컬 단위 테스트: 11개 통과. 관계 검증·이름 변경 후 ID 보존·시간대 월 경계·유효하지 않은 날짜·GA 완료 이벤트·추적표·원본 HTML 해시.
 - lint / TypeScript / production build: 통과. fresh 설치에서 라우트 타입이 없어 실패하지 않도록 typecheck가 next typegen을 먼저 실행한다.
 - Playwright: Chromium desktop·Windows WebKit 375×812·320×640에서 3개 통과. 합성 표시·필터·미수집 값·가로 넘침·외부 요청 없음 확인. [375px](screenshots/phase0-375.png), [320px](screenshots/phase0-320.png), [desktop](screenshots/phase0-desktop.png).
-- GitHub CI: PR 등록 후 확인.
+- GitHub CI: 코드 커밋 cc19d63의 [quality / browsers 모두 통과](https://github.com/eye215/pmziip/actions/runs/45536236658). Node 24/Linux의 lint·typecheck·unit·build 및 Chromium desktop/Linux WebKit 375×812·320×640 확인. 문서 변경 후 최신 상태는 PR의 Checks를 따른다.
 - 실제 iPhone Safari/PWA: 미검증. Playwright WebKit을 실기기 검증으로 표시하지 않는다.
 - 실제 GA/DB/AI/메시지 연동: 미구현·미연결. 실제 수치를 조회하거나 발송하지 않았다.
 - npm production dependency audit: 알려진 취약점 0개(실행 시점). ESLint 9 지원 종료 경고와 10 peer 비호환은 README에 유지보수 항목으로 기록.
