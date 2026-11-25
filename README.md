@@ -2,7 +2,9 @@
 
 요구사항부터 측정 계획·배포·성과 검증을 연결하는 멀티 프로젝트 PM 워크스페이스.
 
-**현재는 Phase 0 기반입니다.** 합성 프로젝트 화면과 개발 환경만 제공합니다. 실제 로그인, CRUD, 운영 DB, GA4/Teams/Slack/Gmail 연결, AI 호출·자동 보고 및 배포는 구현하거나 실행하지 않았습니다. 화면의 미수집 값은 0이나 실제 성과가 아닙니다.
+**현재는 Phase 1 합성 로컬 모드입니다.** 고객사·프로젝트 CRUD/보관·복원, 원문 수집함과 수정 이력, 과제 CRUD/병합, 다대다 연결, 수집·기획·목표월 조회, 이전 JSON 미리보기 가져오기를 제공합니다. 실제 로그인·API/DB 권한·외부 연결은 아직 없습니다. 실제 회사 자료는 입력하지 마세요. 미수집 KPI는 0이나 실제 성과가 아닙니다.
+
+입력은 해당 브라우저에만 보관됩니다. 브라우저 저장소를 지우기 전에 ‘백업·가져오기’에서 JSON을 내려받으세요. 새 형식 백업 복원은 Phase 5 예정이며 현재 가져오기는 v0.1 배열 JSON만 지원합니다. 저장이 실패하면 입력값을 보존하고, 다른 탭의 변경·알 수 없는 데이터 버전·손상된 데이터는 덮어쓰지 않습니다. Web Locks를 지원하지 않는 환경은 쓰기를 거부합니다.
 
 ## 실행
 
@@ -37,6 +39,6 @@ ESLint는 Next의 React/import/accessibility 플러그인 peer 범위와 맞는 
 - [v1.2 확장 명세](docs/06-v1.2-spec.md) / [F01~F44 추적표](docs/07-requirements-trace.md)
 - [기반 ADR](docs/adr/0001-foundation.md) / [첨부 코드 검토](docs/REFERENCE_REVIEW.md)
 
-v1.1 원본의 F01~F28/T01~T28은 보존하고 F29~F44/T29~T44를 추가했습니다. Phase 0의 테스트를 제품 기능 인수 완료로 표시하지 않습니다. 원본 HTML은 `reference/pmzip.html`에 바이트 그대로 보존했습니다. 이전 개발 README도 `reference/README-v1.1.md`에 있습니다.
+v1.1 원본의 F01~F28/T01~T28은 보존하고 F29~F44/T29~T44를 추가했습니다. 합성 모드 검증을 실제 인증·DB 인수 완료로 표시하지 않습니다. [Phase 1 구현 및 검증](docs/PHASE1.md)에 완료 범위와 보류 항목을 기록합니다. 원본 HTML은 `reference/pmzip.html`에 바이트 그대로 보존했습니다. 이전 개발 README도 `reference/README-v1.1.md`에 있습니다.
 
 저장소: [eye215/pmziip](https://github.com/eye215/pmziip). Phase별 브랜치/PR로 진행하며 main 직접 기능 반영·무단 운영 배포는 하지 않습니다. 첨부 Apps Script 원본과 실제 리소스 식별자는 저장소에 포함하지 않습니다.

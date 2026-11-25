@@ -1,4 +1,4 @@
-name: Phase foundation checks
+name: PM.zip checks
 on:
   pull_request:
   push:

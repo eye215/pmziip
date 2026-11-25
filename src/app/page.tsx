@@ -1,3 +1,5 @@
-import { WorkspacePreview } from "@/features/workspace-preview";
+import { WorkspaceApp } from "@/features/records/workspace-app";
 
-export default function Home() { return <WorkspacePreview />; }
+export default function Home() {
+  return <WorkspaceApp />;
+}
