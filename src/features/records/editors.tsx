@@ -1,5 +1,7 @@
 "use client";
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -34,6 +36,86 @@ export const statusNames: Record<string, string> = {
   reviewed: "검토함",
   linked: "연결됨",
 };
+// Display-only Korean labels. Stored values are never rewritten.
+const sourceTypeNames: Record<string, string> = {
+  manual: "직접 입력",
+  mail: "메일",
+  slack: "Slack",
+  teams: "Teams",
+  other: "기타",
+};
+const sensitivityNames: Record<string, string> = {
+  public: "공개",
+  internal: "내부",
+  confidential: "기밀",
+};
+const categoryNames: Record<string, string> = {
+  improvement: "개선",
+  fix: "오류",
+  new: "신규",
+  other: "기타",
+};
+const priorityNames: Record<string, string> = {
+  high: "높음",
+  medium: "보통",
+  low: "낮음",
+};
+const actionNames: Record<string, string> = {
+  "client.save": "고객사 저장",
+  "client.archive": "고객사 보관 상태 변경",
+  "project.save": "프로젝트 저장",
+  "project.archive": "프로젝트 보관 상태 변경",
+  "source.save": "원문 저장",
+  "source.status": "원문 상태 변경",
+  "source.link": "원문 연결",
+  "initiative.save": "과제 저장",
+  "initiative.merge": "과제 병합",
+  "legacy.import": "이전 버전 가져오기",
+};
+/** Unknown values are shown as stored so nothing is hidden. */
+function named(names: Record<string, string>, value: string) {
+  return Object.hasOwn(names, value) ? names[value] : value;
+}
+
+/** Error raised for a specific form value (path matches the input field). */
+class FieldError extends Error {
+  constructor(
+    readonly path: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+function atField<T>(path: string, run: () => T): T {
+  try {
+    return run();
+  } catch (error) {
+    if (error instanceof FieldError || error instanceof z.ZodError) throw error;
+    throw new FieldError(path, error instanceof Error ? error.message : "");
+  }
+}
+const ERROR_ID = "editor-error";
+type FormErrors = { invalid: string[]; clear: (path: string) => void };
+const FormErrorContext = createContext<FormErrors>({
+  invalid: [],
+  clear: () => {},
+});
+/** aria props linking a control to the editor error when its value is invalid. */
+function useInvalid(path?: string) {
+  const ctx = useContext(FormErrorContext);
+  const invalid = !!path && ctx.invalid.includes(path);
+  return {
+    props: {
+      "data-path": path,
+      "aria-invalid": invalid || undefined,
+      "aria-describedby": invalid ? ERROR_ID : undefined,
+    },
+    clear: () => {
+      if (invalid && path) ctx.clear(path);
+    },
+  };
+}
+
 export type Editor = {
   kind:
     | "client"
@@ -56,6 +138,8 @@ function Field({
   area = false,
   type = "text",
   required = false,
+  path,
+  hint,
 }: {
   name: string;
   label: string;
@@ -64,24 +148,41 @@ function Field({
   area?: boolean;
   type?: string;
   required?: boolean;
+  /** Input key used in validation errors (e.g. "title"). */
+  path?: string;
+  /** id of a visible hint/error that describes this field. */
+  hint?: string;
 }) {
+  const invalid = useInvalid(path);
+  const describedBy =
+    [invalid.props["aria-describedby"], hint].filter(Boolean).join(" ") ||
+    undefined;
+  const common = {
+    id: name,
+    value,
+    required,
+    ...invalid.props,
+    "aria-describedby": describedBy,
+  };
   return (
     <div className="field">
       <label htmlFor={name}>{label}</label>
       {area ? (
         <textarea
-          id={name}
-          value={value}
-          onChange={(e) => change(e.target.value)}
-          required={required}
+          {...common}
+          onChange={(e) => {
+            invalid.clear();
+            change(e.target.value);
+          }}
         />
       ) : (
         <input
-          id={name}
+          {...common}
           type={type}
-          value={value}
-          onChange={(e) => change(e.target.value)}
-          required={required}
+          onChange={(e) => {
+            invalid.clear();
+            change(e.target.value);
+          }}
         />
       )}
     </div>
@@ -94,6 +195,7 @@ function Select({
   change,
   children,
   disabled = false,
+  path,
 }: {
   name: string;
   label: string;
@@ -101,27 +203,104 @@ function Select({
   change: (v: string) => void;
   children: ReactNode;
   disabled?: boolean;
+  path?: string;
 }) {
+  const invalid = useInvalid(path);
   return (
     <div className="field">
       <label htmlFor={name}>{label}</label>
       <select
         id={name}
         value={value}
-        onChange={(e) => change(e.target.value)}
+        onChange={(e) => {
+          invalid.clear();
+          change(e.target.value);
+        }}
         disabled={disabled}
+        {...invalid.props}
       >
         {children}
       </select>
     </div>
   );
 }
+function issueText(issue: z.core.$ZodIssue) {
+  if (issue.code === "custom") return issue.message;
+  if (issue.code === "too_big" && typeof issue.maximum === "number")
+    return `${issue.maximum}자 이하로 입력해 주세요.`;
+  if (issue.code === "invalid_format") return "형식을 확인해 주세요.";
+  return "입력값을 확인해 주세요.";
+}
+/** Confirmation checkbox; same markup as before plus error linking. */
+function Confirm({
+  path,
+  checked,
+  change,
+  children,
+}: {
+  path: string;
+  checked: boolean;
+  change: (checked: boolean) => void;
+  children: ReactNode;
+}) {
+  const invalid = useInvalid(path);
+  return (
+    <label className="check">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => {
+          invalid.clear();
+          change(e.target.checked);
+        }}
+        {...invalid.props}
+      />
+      {children}
+    </label>
+  );
+}
 function message(error: unknown) {
   return error instanceof z.ZodError
-    ? error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" / ")
+    ? error.issues
+        .map((i) => `${i.path.join(".")}: ${issueText(i)}`)
+        .join(" / ")
     : error instanceof Error
       ? error.message
       : "저장하지 못했습니다. 입력값을 보존했습니다.";
+}
+/** Field paths named by an error, in issue order. */
+function errorPaths(error: unknown): string[] {
+  if (error instanceof FieldError) return [error.path];
+  if (error instanceof z.ZodError)
+    return error.issues.map((i) => String(i.path[0] ?? "")).filter(Boolean);
+  return [];
+}
+/** Uses the on-screen label for a path so messages match what users see. */
+function describeError(form: HTMLFormElement | null, error: unknown) {
+  const labelFor = (path: string) => {
+    const control = form?.querySelector<HTMLElement>(
+      `[data-path="${CSS.escape(path)}"]`,
+    );
+    const label =
+      control?.id &&
+      form?.querySelector(`label[for="${CSS.escape(control.id)}"]`);
+    return (
+      (label && label.textContent?.trim()) ||
+      control?.closest("label")?.textContent?.trim() ||
+      path
+    );
+  };
+  if (error instanceof z.ZodError)
+    return error.issues
+      .map((i) =>
+        i.path.length
+          ? `${labelFor(String(i.path[0]))}: ${issueText(i)}`
+          : issueText(i),
+      )
+      .join(" / ");
+  if (error instanceof FieldError)
+    return `${labelFor(error.path)}: ${error.message || "입력값을 확인해 주세요."}`;
+  return message(error);
 }
 function Frame({
   title,
@@ -135,11 +314,31 @@ function Frame({
   children: ReactNode;
 }) {
   const [error, setError] = useState("");
+  const [invalid, setInvalid] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // Bumped on each failure so focus moves even when the message repeats.
+  const [failures, setFailures] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const errorBox = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     heading.current?.focus();
   }, []);
+  useEffect(() => {
+    if (!failures) return;
+    // Focus the first invalid control; otherwise the message itself, since
+    // the disabled submit button would leave focus on the page body.
+    const target =
+      invalid
+        .map((path) =>
+          form.current?.querySelector<HTMLElement>(
+            `[data-path="${CSS.escape(path)}"]:not(:disabled)`,
+          ),
+        )
+        .find(Boolean) || errorBox.current;
+    target?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run per failure
+  }, [failures]);
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -147,7 +346,10 @@ function Frame({
     try {
       await save();
     } catch (error) {
-      setError(message(error));
+      // Typed values stay in the editor state; only the message changes.
+      setError(describeError(form.current, error));
+      setInvalid(errorPaths(error));
+      setFailures((n) => n + 1);
     } finally {
       setBusy(false);
     }
@@ -160,12 +362,30 @@ function Frame({
       <p className="subtle">
         이 브라우저에만 저장됩니다. 실제 회사 자료는 입력하지 마세요.
       </p>
-      <form onSubmit={submit}>
-        <fieldset className="editor-fields" disabled={busy}>
-          {children}
-        </fieldset>
+      <form
+        ref={form}
+        onSubmit={submit}
+        aria-labelledby="editor-title"
+        aria-describedby={error ? ERROR_ID : undefined}
+      >
+        <FormErrorContext.Provider
+          value={{
+            invalid,
+            clear: (path) => setInvalid((x) => x.filter((p) => p !== path)),
+          }}
+        >
+          <fieldset className="editor-fields" disabled={busy}>
+            {children}
+          </fieldset>
+        </FormErrorContext.Provider>
         {error && (
-          <p role="alert" className="error-box">
+          <p
+            id={ERROR_ID}
+            ref={errorBox}
+            role="alert"
+            className="error-box"
+            tabIndex={-1}
+          >
             {error}
           </p>
         )}
@@ -207,6 +427,7 @@ function ClientEditor({ state, editor, close }: Props) {
     >
       <Field
         name="client-name"
+        path="name"
         label="고객사 이름"
         value={data.name}
         change={(name) => setData({ ...data, name })}
@@ -214,6 +435,7 @@ function ClientEditor({ state, editor, close }: Props) {
       />
       <Field
         name="client-description"
+        path="description"
         label="고객사 설명"
         value={data.description}
         change={(description) => setData({ ...data, description })}
@@ -252,6 +474,7 @@ function ProjectEditor({ state, editor, close }: Props) {
     >
       <Field
         name="project-name"
+        path="name"
         label="프로젝트 이름"
         value={data.name}
         change={(name) => setData({ ...data, name })}
@@ -259,6 +482,7 @@ function ProjectEditor({ state, editor, close }: Props) {
       />
       <Field
         name="project-description"
+        path="description"
         label="프로젝트 설명"
         value={data.description}
         change={(description) => setData({ ...data, description })}
@@ -266,6 +490,7 @@ function ProjectEditor({ state, editor, close }: Props) {
       />
       <Select
         name="project-client"
+        path="clientId"
         label="고객사"
         value={data.clientId}
         change={(clientId) => setData({ ...data, clientId })}
@@ -282,6 +507,7 @@ function ProjectEditor({ state, editor, close }: Props) {
       </Select>
       <Field
         name="project-timezone"
+        path="timezone"
         label="프로젝트 시간대"
         value={data.timezone}
         change={(timezone) => setData({ ...data, timezone })}
@@ -289,6 +515,7 @@ function ProjectEditor({ state, editor, close }: Props) {
       />
       <Select
         name="project-kind"
+        path="kind"
         label="프로젝트 유형"
         value={data.kind}
         change={(kind) => setData({ ...data, kind: kind as typeof data.kind })}
@@ -326,7 +553,9 @@ function SourceEditor({ state, editor, close }: Props) {
             id: old?.id,
             data: sourceInput.parse({
               ...data,
-              collectedAt: instantFromLocal(collected, data.collectedAt),
+              collectedAt: atField("collectedAt", () =>
+                instantFromLocal(collected, data.collectedAt),
+              ),
             }),
           },
           editor,
@@ -336,6 +565,7 @@ function SourceEditor({ state, editor, close }: Props) {
     >
       <Field
         name="source-title"
+        path="title"
         label="원문 제목"
         value={data.title}
         change={(title) => setData({ ...data, title })}
@@ -343,6 +573,7 @@ function SourceEditor({ state, editor, close }: Props) {
       />
       <Field
         name="source-raw"
+        path="rawText"
         label="원문 내용"
         value={data.rawText}
         change={(rawText) => setData({ ...data, rawText })}
@@ -351,6 +582,7 @@ function SourceEditor({ state, editor, close }: Props) {
       />
       <Select
         name="source-type"
+        path="sourceType"
         label="출처 유형"
         value={data.sourceType}
         change={(sourceType) =>
@@ -359,20 +591,13 @@ function SourceEditor({ state, editor, close }: Props) {
       >
         {["manual", "mail", "slack", "teams", "other"].map((x) => (
           <option key={x} value={x}>
-            {
-              {
-                manual: "직접 입력",
-                mail: "메일",
-                slack: "Slack",
-                teams: "Teams",
-                other: "기타",
-              }[x]
-            }
+            {sourceTypeNames[x]}
           </option>
         ))}
       </Select>
       <Field
         name="source-reference"
+        path="reference"
         label="원문 링크"
         value={data.reference}
         change={(reference) => setData({ ...data, reference })}
@@ -380,6 +605,7 @@ function SourceEditor({ state, editor, close }: Props) {
       <p className="subtle">링크는 자동으로 열거나 수집하지 않습니다.</p>
       <Field
         name="source-collected"
+        path="collectedAt"
         label="수집 일시"
         type="datetime-local"
         value={collected}
@@ -392,12 +618,14 @@ function SourceEditor({ state, editor, close }: Props) {
       </p>
       <Field
         name="source-requester"
+        path="requesterRole"
         label="요청자 역할"
         value={data.requesterRole}
         change={(requesterRole) => setData({ ...data, requesterRole })}
       />
       <Select
         name="source-sensitivity"
+        path="sensitivity"
         label="민감도"
         value={data.sensitivity}
         change={(sensitivity) =>
@@ -506,7 +734,8 @@ function InitiativeEditor({ state, editor, close }: Props) {
       close={close}
       save={() => {
         if (duplicates.length && !allowDuplicate)
-          throw new Error(
+          throw new FieldError(
+            "allowDuplicate",
             "같은 제목의 과제가 있습니다. 중복 여부를 확인해 주세요.",
           );
         return persist(
@@ -515,7 +744,9 @@ function InitiativeEditor({ state, editor, close }: Props) {
             id: old?.id,
             data: initiativeInput.parse({
               ...data,
-              plannedAt: instantFromLocal(planned, old?.plannedAt),
+              plannedAt: atField("plannedAt", () =>
+                instantFromLocal(planned, old?.plannedAt),
+              ),
               targetMonth: data.targetMonth || null,
             }),
             sourceIds,
@@ -527,6 +758,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
     >
       <Select
         name="work-project"
+        path="projectId"
         label="과제 프로젝트"
         value={data.projectId}
         change={(projectId) => {
@@ -545,6 +777,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       </Select>
       <Field
         name="work-title"
+        path="title"
         label="과제 제목"
         value={data.title}
         change={(title) => {
@@ -556,19 +789,19 @@ function InitiativeEditor({ state, editor, close }: Props) {
       {duplicates.length > 0 && (
         <div className="notice">
           <p>같은 제목의 과제 {duplicates.length}개가 있습니다.</p>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={allowDuplicate}
-              onChange={(e) => setAllowDuplicate(e.target.checked)}
-            />
+          <Confirm
+            path="allowDuplicate"
+            checked={allowDuplicate}
+            change={setAllowDuplicate}
+          >
             서로 다른 과제임을 확인했습니다
-          </label>
+          </Confirm>
         </div>
       )}
       <div className="field-grid">
         <Select
           name="work-status"
+          path="status"
           label="업무 상태"
           value={data.status}
           change={(status) =>
@@ -583,6 +816,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
         </Select>
         <Select
           name="work-priority"
+          path="priority"
           label="우선순위"
           value={data.priority}
           change={(priority) =>
@@ -595,6 +829,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
         </Select>
         <Select
           name="work-category"
+          path="category"
           label="과제 유형"
           value={data.category}
           change={(category) =>
@@ -608,6 +843,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
         </Select>
         <Field
           name="work-assignee"
+          path="assignee"
           label="담당"
           value={data.assignee}
           change={(assignee) => setData({ ...data, assignee })}
@@ -615,6 +851,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       </div>
       <Field
         name="work-problem"
+        path="problem"
         label="문제"
         value={data.problem}
         change={(problem) => setData({ ...data, problem })}
@@ -622,12 +859,14 @@ function InitiativeEditor({ state, editor, close }: Props) {
       />
       <Field
         name="work-target"
+        path="targetSegment"
         label="대상 사용자"
         value={data.targetSegment}
         change={(targetSegment) => setData({ ...data, targetSegment })}
       />
       <Field
         name="work-change"
+        path="expectedChange"
         label="기대 변화"
         value={data.expectedChange}
         change={(expectedChange) => setData({ ...data, expectedChange })}
@@ -636,6 +875,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       <div className="field-grid">
         <Field
           name="work-planned"
+          path="plannedAt"
           label="기획 일시 (선택)"
           type="datetime-local"
           value={planned}
@@ -643,6 +883,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
         />
         <Field
           name="work-month"
+          path="targetMonth"
           label="목표 월"
           type="month"
           value={data.targetMonth}
@@ -655,6 +896,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       </p>
       <Field
         name="work-contribution"
+        path="contribution"
         label="개인 기여"
         value={data.contribution}
         change={(contribution) => setData({ ...data, contribution })}
@@ -662,6 +904,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       />
       <Field
         name="work-decision"
+        path="decisionReason"
         label="결정 근거"
         value={data.decisionReason}
         change={(decisionReason) => setData({ ...data, decisionReason })}
@@ -669,6 +912,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       />
       <Field
         name="work-alternative"
+        path="alternative"
         label="검토한 대안"
         value={data.alternative}
         change={(alternative) => setData({ ...data, alternative })}
@@ -741,7 +985,10 @@ function MergeEditor({ state, editor, close }: Props) {
       close={close}
       save={() => {
         if (!approved)
-          throw new Error("원본 보존과 연결 변경을 확인해 주세요.");
+          throw new FieldError(
+            "approved",
+            "원본 보존과 연결 변경을 확인해 주세요.",
+          );
         return persist(
           { type: "initiative.merge", fromId: from.id, intoId, reason },
           editor,
@@ -755,6 +1002,7 @@ function MergeEditor({ state, editor, close }: Props) {
       </p>
       <Select
         name="merge-target"
+        path="intoId"
         label="남길 과제"
         value={intoId}
         change={setInto}
@@ -775,20 +1023,16 @@ function MergeEditor({ state, editor, close }: Props) {
       </Select>
       <Field
         name="merge-reason"
+        path="reason"
         label="병합 사유"
         value={reason}
         change={setReason}
         area
         required
       />
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={approved}
-          onChange={(e) => setApproved(e.target.checked)}
-        />
+      <Confirm path="approved" checked={approved} change={setApproved}>
         원본이 보관되고 연결이 추가됨을 확인했습니다
-      </label>
+      </Confirm>
     </Frame>
   );
 }
@@ -813,7 +1057,10 @@ function ImportEditor({ state, editor, close }: Props) {
       close={close}
       save={async () => {
         if (!preview || !approved)
-          throw new Error("미리보기와 가져오기 승인이 필요합니다.");
+          throw new FieldError(
+            preview ? "approved" : "preview",
+            "미리보기와 가져오기 승인이 필요합니다.",
+          );
         await saveRecords(
           (s) => importLegacy(s, text, mapping, runtime),
           editor.revision,
@@ -852,9 +1099,11 @@ function ImportEditor({ state, editor, close }: Props) {
         value={text}
         change={update}
         area
+        hint={error ? "import-error" : undefined}
       />
       <button
         type="button"
+        data-path="preview"
         onClick={() => {
           try {
             setPreview(previewLegacy(state, text, session));
@@ -868,7 +1117,7 @@ function ImportEditor({ state, editor, close }: Props) {
         미리보기
       </button>
       {error && (
-        <p role="alert" className="error-box">
+        <p id="import-error" role="alert" className="error-box">
           {error}
         </p>
       )}
@@ -908,20 +1157,58 @@ function ImportEditor({ state, editor, close }: Props) {
             기존 KPI·산식·관측값 등 모든 원래 필드는 과제의 ‘이전 버전 원본’에
             보존합니다. 실제 배포·성과로 자동 확정하지 않습니다.
           </p>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={approved}
-              onChange={(e) => setApproved(e.target.checked)}
-            />
+          <Confirm path="approved" checked={approved} change={setApproved}>
             미리보기와 프로젝트 연결을 확인했습니다
-          </label>
+          </Confirm>
         </div>
       )}
     </Frame>
   );
 }
+// Last button the user activated (mouse, touch or keyboard). WebKit does not
+// focus buttons on click, so document.activeElement alone is not enough.
+let lastActivated: HTMLElement | null = null;
+if (typeof document !== "undefined")
+  document.addEventListener(
+    "click",
+    (e) => {
+      const button =
+        e.target instanceof Element ? e.target.closest("button") : null;
+      if (button && !button.closest(".editor")) lastActivated = button;
+    },
+    true,
+  );
+function opener(): HTMLElement | null {
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLElement &&
+    active !== document.body &&
+    !active.closest(".editor")
+  )
+    return active;
+  return lastActivated?.isConnected ? lastActivated : null;
+}
 export function RecordEditor(props: Props) {
+  // Captured on first render, before the editor heading takes focus.
+  const [origin] = useState(() =>
+    typeof document === "undefined" ? null : opener(),
+  );
+  const closing = useRef(false);
+  useEffect(
+    () => () => {
+      // Only after cancel/save; not when another editor replaces this one.
+      if (closing.current && origin?.isConnected)
+        origin.focus({ preventScroll: false });
+    },
+    [origin],
+  );
+  const close = () => {
+    closing.current = true;
+    props.close();
+  };
+  return <EditorBody {...props} close={close} />;
+}
+function EditorBody(props: Props) {
   switch (props.editor.kind) {
     case "client":
       return <ClientEditor {...props} />;
@@ -952,12 +1239,18 @@ export function SourceDetails({
       <pre>{source.rawText}</pre>
       <p>
         수집: {source.collectedAt} · 요청자 역할:{" "}
-        {source.requesterRole || "미지정"} · {source.sourceType} ·{" "}
-        {source.sensitivity}
+        {source.requesterRole || "미지정"} · 출처:{" "}
+        {named(sourceTypeNames, source.sourceType)} · 민감도:{" "}
+        {named(sensitivityNames, source.sensitivity)}
       </p>
       {source.reference && (
-        <a href={source.reference} rel="noopener noreferrer" target="_blank">
-          원문 링크 열기
+        <a
+          className="source-link"
+          href={source.reference}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          원문 링크 열기<span className="visually-hidden"> (새 창)</span>
         </a>
       )}
       <p>
@@ -989,8 +1282,8 @@ export function SourceDetails({
           <h4>{r.title}</h4>
           <pre>{r.rawText}</pre>
           <p>
-            이전 출처: {r.reference || "없음"} · {r.sourceType} ·{" "}
-            {r.collectedAt}
+            이전 출처: {r.reference || "없음"} ·{" "}
+            {named(sourceTypeNames, r.sourceType)} · 수집: {r.collectedAt}
           </p>
         </details>
       ))}
@@ -1008,8 +1301,8 @@ export function InitiativeDetails({
     ["문제", work.problem],
     ["대상", work.targetSegment],
     ["기대 변화", work.expectedChange],
-    ["유형", work.category],
-    ["우선순위", work.priority],
+    ["유형", named(categoryNames, work.category)],
+    ["우선순위", named(priorityNames, work.priority)],
     ["담당", work.assignee],
     ["기여", work.contribution],
     ["결정 근거", work.decisionReason],
@@ -1028,7 +1321,7 @@ export function InitiativeDetails({
           </div>
         ))}
       </dl>
-      <p>측정 준비: 미준비 · 측정 계획은 후속 단계</p>
+      <p>업무 상태와 측정 준비는 별도로 관리합니다</p>
       {work.mergedInto && (
         <p>
           병합 대상:{" "}
@@ -1060,7 +1353,8 @@ export function InitiativeDetails({
           .map((a) => (
             <div key={a.id}>
               <p>
-                {a.at} · {a.action} · {a.detail}
+                {a.at} · {named(actionNames, a.action)}
+                {a.detail ? ` · ${a.detail}` : ""}
               </p>
               {a.before && <pre>{JSON.stringify(a.before, null, 2)}</pre>}
             </div>
