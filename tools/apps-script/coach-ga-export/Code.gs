@@ -2,8 +2,8 @@
  * PM.zip Galaxy Coach GA4 export (read-only). NEW standalone script.
  * - Does NOT modify or call the existing CoachData / CoachGlobalData scripts or sheets.
  * - GA property ID lives in Script Properties (GA_PROPERTY_ID), never in code or the repo.
- * - Output: pmzip.coach-ga-export v1 JSON, imported manually in PM.zip
- *   (백업·가져오기 > Galaxy Coach GA 가져오기).
+ * - Output: pmzip.coach-ga-export v1 JSON, written to this (new) spreadsheet
+ *   for PM.zip auto-sync, or downloaded via the web app for manual import.
  * Definition must match src/lib/connectors/coach-definition.ts (coach-ga4-1.2);
  * tests/unit/coach-export.test.ts checks these constants.
  */
@@ -19,6 +19,10 @@ var COUNTRY_DIMENSION = 'countryId';
 var SALES_CASE_DIMENSION = 'customEvent:nsp_category';
 var VALID_SCORES = ['1', '2', '3', '4', '5'];
 var EXPORT_FILE_NAME = 'pmzip-coach-ga-export.json';
+var EXPORT_TAB = 'pmzip_export';
+var SUMMARY_TAB = 'pmzip_summary';
+var CHUNK_HEADER = 'pmzip.coach-ga-export.chunks';
+var CHUNK_SIZE = 30000; // Sheets cell limit is 50,000 characters.
 
 /** Web app (Execute as: Me, Access: Only myself). ?start=YYYY-MM-DD&end=YYYY-MM-DD optional. */
 function doGet(e) {
@@ -30,29 +34,73 @@ function doGet(e) {
     .downloadAsFile(EXPORT_FILE_NAME);
 }
 
-/** Run from the editor, or by the daily trigger: writes the JSON to your Drive. */
-function exportToDrive() {
-  var json = JSON.stringify(buildExport_(defaultPeriods_()), null, 2);
-  var props = PropertiesService.getScriptProperties();
-  var fileId = props.getProperty('EXPORT_FILE_ID');
-  if (fileId) {
-    try {
-      DriveApp.getFileById(fileId).setContent(json);
-      return;
-    } catch (err) {
-      // File removed or not accessible: create a new one below.
-    }
+/**
+ * Run from the editor, or by the daily trigger. Writes to THIS spreadsheet
+ * (create a NEW spreadsheet and open Extensions > Apps Script there):
+ * - tab pmzip_export: column A = export JSON in text chunks, read by PM.zip
+ *   (share the spreadsheet as "Anyone with the link: Viewer").
+ * - tab pmzip_summary: human-readable totals for checking against old reports.
+ */
+function exportToSheet() {
+  var data = buildExport_(defaultPeriods_());
+  var json = asciiJson_(data);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('새 스프레드시트의 확장 프로그램 > Apps Script에서 실행해 주세요.');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    writeChunks_(sheet_(ss, EXPORT_TAB), json);
+    writeSummary_(sheet_(ss, SUMMARY_TAB), data);
+  } finally {
+    lock.releaseLock();
   }
-  var file = DriveApp.createFile(EXPORT_FILE_NAME, json, MimeType.PLAIN_TEXT);
-  props.setProperty('EXPORT_FILE_ID', file.getId());
 }
 
 /** Installs one daily trigger (06:00-07:00 script time zone). Safe to re-run. */
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'exportToDrive') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'exportToSheet') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('exportToDrive').timeBased().everyDays(1).atHour(6).create();
+  ScriptApp.newTrigger('exportToSheet').timeBased().everyDays(1).atHour(6).create();
+}
+
+/** JSON with non-ASCII escaped, so chunk boundaries never split a character. */
+function asciiJson_(data) {
+  return JSON.stringify(data).replace(/[\u007f-\uffff]/g, function (c) {
+    return '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4);
+  });
+}
+function sheet_(ss, name) {
+  return ss.getSheetByName(name) || ss.insertSheet(name);
+}
+function sha256Hex_(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8)
+    .map(function (b) { return ((b + 256) % 256).toString(16); })
+    .map(function (h) { return h.length === 1 ? '0' + h : h; })
+    .join('');
+}
+/** Each chunk is wrapped in "|" so Sheets never turns it into a number/formula. */
+function writeChunks_(sheet, json) {
+  var chunks = [];
+  for (var i = 0; i < json.length; i += CHUNK_SIZE) chunks.push('|' + json.slice(i, i + CHUNK_SIZE) + '|');
+  var rows = [[CHUNK_HEADER + '|v1|' + chunks.length + '|' + sha256Hex_(json)]].concat(
+    chunks.map(function (c) { return [c]; }),
+  );
+  sheet.clearContents();
+  var range = sheet.getRange(1, 1, rows.length, 1);
+  range.setNumberFormat('@');
+  range.setValues(rows);
+}
+function writeSummary_(sheet, data) {
+  var header = ['기간 시작', '기간 끝', '진입 UU', '진입 횟수', '시작 UU', '시작 횟수', '완료 UU', 'REPORT 전체', '유효 점수(1~5)', '생성 시각', '정의'];
+  var rows = data.periods.map(function (p) {
+    var valid = VALID_SCORES.reduce(function (a, s) { return a === null || p.scores[s] === null ? null : a + p.scores[s]; }, 0);
+    var v = function (x) { return x === null ? '미집계' : x; };
+    return [p.startDate, p.endDate, v(p.totals.main.users), v(p.totals.main.count), v(p.totals.start.users), v(p.totals.start.count),
+      v(p.totals.done.users), v(p.totals.done.count), v(valid), data.generatedAt, data.definitionVersion];
+  });
+  sheet.clearContents();
+  sheet.getRange(1, 1, rows.length + 1, header.length).setNumberFormat('@').setValues([header].concat(rows));
 }
 
 /** Last 7 full days, month-to-date (until yesterday), previous two full months. */

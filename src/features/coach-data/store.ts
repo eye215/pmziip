@@ -182,3 +182,38 @@ export function latestSnapshots(state: CoachStore, projectId: string) {
         : b.latest.period.startDate.localeCompare(a.latest.period.startDate),
     );
 }
+
+/** Link-shared sheet setting. Stored in this browser only (never in the repo). */
+export const coachSourceSchema = z
+  .object({
+    sheetId: z.string().regex(/^[A-Za-z0-9_-]{25,100}$/),
+    projectId: id,
+    lastSyncAt: instant.nullable(),
+    lastResult: z.string().max(500).nullable(),
+    lastOk: z.boolean().nullable(),
+  })
+  .strict();
+export type CoachSource = z.infer<typeof coachSourceSchema>;
+export const coachSourceKey = (s: CoachSession) =>
+  `pmzip:coach-ga-source:v1:${s.ownerId}:${s.workspaceId}`;
+export function loadCoachSource(
+  storage: Storage,
+  session: CoachSession,
+): CoachSource | null {
+  const raw = storage.getItem(coachSourceKey(session));
+  if (raw === null) return null;
+  const parsed = coachSourceSchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : null;
+}
+export function saveCoachSource(
+  storage: Storage & { removeItem?: (key: string) => void },
+  session: CoachSession,
+  source: CoachSource | null,
+) {
+  if (source === null) storage.removeItem?.(coachSourceKey(session));
+  else
+    storage.setItem(
+      coachSourceKey(session),
+      JSON.stringify(coachSourceSchema.parse(source)),
+    );
+}

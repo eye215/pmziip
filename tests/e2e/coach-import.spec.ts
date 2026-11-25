@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 // Synthetic export only: no GA, Apps Script or company data is contacted.
@@ -61,6 +62,7 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   page,
 }) => {
   const panel = await openPanel(page);
+  await panel.getByText("파일로 직접 가져오기", { exact: true }).click();
   const json = panel.getByLabel("내보내기 JSON 붙여넣기", { exact: true });
   const preview = panel.getByRole("button", {
     name: "GA 파일 미리보기",
@@ -133,6 +135,7 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   // Reload keeps data; identical re-import is skipped.
   await page.reload();
   const again = await openPanel(page);
+  await again.getByText("파일로 직접 가져오기", { exact: true }).click();
   await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
   await again
     .getByLabel("내보내기 JSON 붙여넣기", { exact: true })
@@ -146,4 +149,68 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   await expect(
     again.getByRole("button", { name: "GA 기간 저장", exact: true }),
   ).toBeDisabled();
+});
+
+/** Same chunk layout as Code.gs exportToSheet, served like gviz CSV. */
+async function sheetCsv() {
+  const json = JSON.stringify(JSON.parse(await fixture()));
+  const chunks: string[] = [];
+  for (let i = 0; i < json.length; i += 700)
+    chunks.push("|" + json.slice(i, i + 700) + "|");
+  const hash = createHash("sha256").update(json, "utf8").digest("hex");
+  return [`pmzip.coach-ga-export.chunks|v1|${chunks.length}|${hash}`, ...chunks]
+    .map((c) => `"${c.replaceAll('"', '""')}"`)
+    .join("\n");
+}
+const SHEET_ID = "SyntheticSheetId_0123456789abcdefghij";
+
+test("linked sheet: connect, auto-sync once per visit, idempotent, failure keeps data", async ({
+  page,
+}) => {
+  let status = 200;
+  const requests: string[] = [];
+  const body = await sheetCsv();
+  await page.route("https://docs.google.com/**", async (route) => {
+    requests.push(route.request().url());
+    await route.fulfill({
+      status,
+      contentType: "text/csv",
+      headers: { "access-control-allow-origin": "*" },
+      body: status === 200 ? body : "not found",
+    });
+  });
+  const panel = await openPanel(page);
+  await panel
+    .getByLabel("GA 스프레드시트 링크 또는 ID", { exact: true })
+    .fill(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=0`);
+  await panel.getByRole("button", { name: "시트 연결", exact: true }).click();
+  await expect(panel.getByRole("status").first()).toContainText("동기화 완료");
+  await expect(panel).toContainText("새 기간 2개 · 재수집 0개 · 변경 없음 0개");
+  await expect(panel.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  expect(requests[0]).toBe(
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&sheet=pmzip_export`,
+  );
+  await noOverflow(page);
+
+  // Next visit syncs automatically; identical data adds nothing.
+  const again = await openPanel(page);
+  await expect(again).toContainText("새 기간 0개 · 재수집 0개 · 변경 없음 2개");
+  expect(requests).toHaveLength(2);
+  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+
+  // A failing fetch writes nothing and keeps saved periods.
+  status = 404;
+  await again.getByRole("button", { name: "지금 동기화", exact: true }).click();
+  await expect(again.getByRole("alert")).toContainText("HTTP 404");
+  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+
+  // Disconnect removes only the setting, not imported data.
+  page.once("dialog", (d) => d.accept());
+  await again
+    .getByRole("button", { name: "시트 연결 해제", exact: true })
+    .click();
+  await expect(
+    again.getByLabel("GA 스프레드시트 링크 또는 ID", { exact: true }),
+  ).toBeVisible();
+  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
 });

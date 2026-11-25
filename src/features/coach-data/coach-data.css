@@ -52,3 +52,17 @@
     gap: 2px;
   }
 }
+.coach-sheet {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 16px 16px;
+  margin: 18px 0;
+}
+.coach-sheet h3,
+.coach-manual summary {
+  font-size: 15px;
+}
+.coach-sheet .notice,
+.coach-sheet .error-box {
+  overflow-wrap: anywhere;
+}
