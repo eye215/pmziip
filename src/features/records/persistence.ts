@@ -2,6 +2,7 @@ import {
   authorize,
   createState,
   stateSchema,
+  decodeState,
   type RecordsState,
   type Session,
 } from "./model";
@@ -15,7 +16,7 @@ export const storageKey = (session: Session) =>
 export function loadLocal(storage: LocalStorage, session: Session): Loaded {
   const token = storage.getItem(storageKey(session));
   if (token === null) return { state: createState(session), token: null };
-  const state = stateSchema.parse(JSON.parse(token));
+  const state = decodeState(JSON.parse(token));
   authorize(state, session);
   return { state, token };
 }
@@ -40,6 +41,16 @@ export function commitLocal(
     new TextEncoder().encode(token).byteLength > 5_000_000
   )
     throw new Error("로컬 저장 한도를 넘었습니다. 먼저 백업해 주세요.");
+  if (loaded.token && JSON.parse(loaded.token).schemaVersion === 1) {
+    const backupKey =
+      storageKey(session) + ":before-v2:" + loaded.state.revision;
+    const previous = storage.getItem(backupKey);
+    if (previous !== null && previous !== loaded.token)
+      throw new Error(
+        "이전 버전 백업과 충돌했습니다. 기존 기록은 유지했습니다.",
+      );
+    if (previous === null) storage.setItem(backupKey, loaded.token);
+  }
   storage.setItem(storageKey(session), token);
   return { state: next, token };
 }

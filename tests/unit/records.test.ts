@@ -358,7 +358,7 @@ describe("atomic local persistence", () => {
     const store = memory(),
       key = storageKey(runtime.session);
     for (const extra of [
-      { schemaVersion: 2 },
+      { schemaVersion: 3 },
       { futurePlans: [{ important: "preserve" }] },
     ]) {
       const raw = JSON.stringify({ ...createState(runtime.session), ...extra });
