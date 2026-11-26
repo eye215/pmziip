@@ -1,7 +1,8 @@
 /**
  * PM.zip public financials from DART OpenAPI (금융감독원 전자공시, read-only).
  * Same Apps Script project as Code.gs (bound to the NEW PM.zip spreadsheet).
- * - DART_API_KEY and DART_CORP_CODE live in Script Properties only.
+ * - DART_API_KEY and DART_CORP_CODE (one or more 8-digit codes, comma-separated)
+ *   live in Script Properties only.
  * - Writes tab pmzip_dart (chunked JSON + SHA-256) for PM.zip, and
  *   pmzip_dart_summary for people. Public disclosures only; no estimates.
  * API: https://opendart.fss.or.kr  (fnlttSinglAcnt: 단일회사 주요계정)
@@ -51,6 +52,16 @@ function dartAccount_(name) {
   return null;
 }
 
+/** Company name from the 기업개황 API (company.json). */
+function dartCompanyName_(key, corp) {
+  var res = UrlFetchApp.fetch('https://opendart.fss.or.kr/api/company.json?crtfc_key=' +
+    encodeURIComponent(key) + '&corp_code=' + encodeURIComponent(corp), { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('DART HTTP ' + res.getResponseCode());
+  var body = JSON.parse(res.getContentText());
+  if (body.status !== '000') throw new Error('DART ' + body.status + ': ' + body.message);
+  return String(body.corp_name || corp);
+}
+
 function dartFetch_(key, corp, year, reportCode) {
   var url = 'https://opendart.fss.or.kr/api/fnlttSinglAcnt.json' +
     '?crtfc_key=' + encodeURIComponent(key) +
@@ -67,56 +78,61 @@ function dartFetch_(key, corp, year, reportCode) {
 function buildDartExport_() {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('DART_API_KEY');
-  var corp = props.getProperty('DART_CORP_CODE');
+  var corps = String(props.getProperty('DART_CORP_CODE') || '').split(',').map(function (c) { return c.trim(); }).filter(String);
   if (!key) throw new Error('Script Properties에 DART_API_KEY를 설정해 주세요.');
-  if (!corp || !/^\d{8}$/.test(corp)) throw new Error('Script Properties에 DART_CORP_CODE(8자리 고유번호)를 설정해 주세요.');
+  if (!corps.length || corps.some(function (c) { return !/^\d{8}$/.test(c); }))
+    throw new Error('Script Properties에 DART_CORP_CODE(8자리 고유번호, 여러 개면 쉼표로 구분)를 설정해 주세요.');
   var thisYear = Number(Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy'));
   var rows = [];
   var notes = [];
+  var companies = [];
   var seen = {};
   var push = function (row) {
-    var k = [row.year, row.quarter, row.fsDiv, row.account].join('|');
+    var k = [row.corpCode, row.year, row.quarter, row.fsDiv, row.account].join('|');
     if (seen[k]) return; // first matching account wins (e.g. 당기순이익 vs 당기순이익(손실))
     seen[k] = true;
     rows.push(row);
   };
-  for (var y = thisYear - DART_YEARS + 1; y <= thisYear; y++) {
-    var byQuarter = {};
-    DART_REPORTS.forEach(function (r) {
-      var list = dartFetch_(key, corp, y, r.code);
-      byQuarter[r.quarter] = list.filter(function (x) { return x.sj_div === 'IS' || x.sj_div === 'CIS'; });
-    });
-    [1, 2, 3].forEach(function (q) {
-      byQuarter[q].forEach(function (x) {
-        var account = dartAccount_(x.account_nm);
-        if (!account) return;
-        push({
-          year: y, quarter: q, fsDiv: x.fs_div, account: account, accountName: x.account_nm,
-          amount: dartAmount_(x.thstrm_amount), basis: 'reported',
-          reportCode: x.reprt_code, rceptNo: x.rcept_no, currency: x.currency || 'KRW',
+  corps.forEach(function (corp) {
+    companies.push({ corpCode: corp, corpName: dartCompanyName_(key, corp) });
+    for (var y = thisYear - DART_YEARS + 1; y <= thisYear; y++) {
+      var byQuarter = {};
+      DART_REPORTS.forEach(function (r) {
+        var list = dartFetch_(key, corp, y, r.code);
+        byQuarter[r.quarter] = list.filter(function (x) { return x.sj_div === 'IS' || x.sj_div === 'CIS'; });
+      });
+      [1, 2, 3].forEach(function (q) {
+        byQuarter[q].forEach(function (x) {
+          var account = dartAccount_(x.account_nm);
+          if (!account) return;
+          push({
+            corpCode: corp, year: y, quarter: q, fsDiv: x.fs_div, account: account, accountName: x.account_nm,
+            amount: dartAmount_(x.thstrm_amount), basis: 'reported',
+            reportCode: x.reprt_code, rceptNo: x.rcept_no, currency: x.currency || 'KRW',
+          });
         });
       });
-    });
-    // Q4 = full year (사업보고서) − Q1~Q3 cumulative (3분기보고서 누적). Derived, labelled.
-    byQuarter[4].forEach(function (x) {
-      var account = dartAccount_(x.account_nm);
-      if (!account) return;
-      var annual = dartAmount_(x.thstrm_amount);
-      var q3 = byQuarter[3].filter(function (z) { return z.fs_div === x.fs_div && dartAccount_(z.account_nm) === account; })[0];
-      var cum = q3 ? dartAmount_(q3.thstrm_add_amount) : null;
-      push({
-        year: y, quarter: 4, fsDiv: x.fs_div, account: account, accountName: x.account_nm,
-        amount: annual === null || cum === null ? null : annual - cum, basis: 'derived_q4',
-        reportCode: x.reprt_code, rceptNo: x.rcept_no, currency: x.currency || 'KRW',
+      // Q4 = full year (사업보고서) − Q1~Q3 cumulative (3분기보고서 누적). Derived, labelled.
+      byQuarter[4].forEach(function (x) {
+        var account = dartAccount_(x.account_nm);
+        if (!account) return;
+        var annual = dartAmount_(x.thstrm_amount);
+        var q3 = byQuarter[3].filter(function (z) { return z.fs_div === x.fs_div && dartAccount_(z.account_nm) === account; })[0];
+        var cum = q3 ? dartAmount_(q3.thstrm_add_amount) : null;
+        push({
+          corpCode: corp, year: y, quarter: 4, fsDiv: x.fs_div, account: account, accountName: x.account_nm,
+          amount: annual === null || cum === null ? null : annual - cum, basis: 'derived_q4',
+          reportCode: x.reprt_code, rceptNo: x.rcept_no, currency: x.currency || 'KRW',
+        });
+        if (cum === null) notes.push(corp + ' ' + y + '년 4분기는 3분기 누적값이 없어 미집계입니다.');
       });
-      if (cum === null) notes.push(y + '년 4분기는 3분기 누적값이 없어 미집계입니다.');
-    });
-  }
+    }
+  });
   return {
     format: 'pmzip.public-financials',
     formatVersion: 1,
     source: 'dart-opendart-fnlttSinglAcnt',
-    corpCode: corp,
+    companies: companies,
     generatedAt: new Date().toISOString(),
     generator: DART_GENERATOR,
     unit: 'KRW',
@@ -126,9 +142,11 @@ function buildDartExport_() {
 }
 
 function writeDartSummary_(sheet, data) {
-  var header = ['연도', '분기', '연결/별도', '계정', '금액(원)', '산출', '접수번호'];
+  var names = {};
+  data.companies.forEach(function (c) { names[c.corpCode] = c.corpName; });
+  var header = ['회사', '연도', '분기', '연결/별도', '계정', '금액(원)', '산출', '접수번호'];
   var rows = data.rows.map(function (r) {
-    return [String(r.year), 'Q' + r.quarter, r.fsDiv === 'CFS' ? '연결' : '별도', r.accountName,
+    return [names[r.corpCode] || r.corpCode, String(r.year), 'Q' + r.quarter, r.fsDiv === 'CFS' ? '연결' : '별도', r.accountName,
       r.amount === null ? '미집계' : String(r.amount), r.basis === 'derived_q4' ? '연간-3분기누적' : '공시', r.rceptNo];
   });
   sheet.clearContents();
@@ -144,13 +162,19 @@ function findDartCorpCode() {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('DART_API_KEY');
   var stock = props.getProperty('DART_STOCK_CODE');
-  if (!key || !/^\d{6}$/.test(stock || '')) throw new Error('DART_API_KEY와 DART_STOCK_CODE(6자리 종목코드)를 설정해 주세요.');
+  var stocks = String(stock || '').split(',').map(function (x) { return x.trim(); }).filter(String);
+  if (!key || !stocks.length || stocks.some(function (x) { return !/^\d{6}$/.test(x); }))
+    throw new Error('DART_API_KEY와 DART_STOCK_CODE(6자리 종목코드, 여러 개면 쉼표)를 설정해 주세요.');
   var res = UrlFetchApp.fetch('https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=' + encodeURIComponent(key), { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) throw new Error('DART HTTP ' + res.getResponseCode());
   var xml = Utilities.unzip(res.getBlob())[0].getDataAsString('UTF-8');
-  var re = new RegExp('<corp_code>(\\d{8})</corp_code>\\s*<corp_name>([^<]*)</corp_name>(?:\\s*<corp_eng_name>[^<]*</corp_eng_name>)?\\s*<stock_code>' + stock + '</stock_code>');
-  var m = xml.match(re);
-  if (!m) throw new Error('종목코드 ' + stock + '에 해당하는 고유번호를 찾지 못했습니다.');
-  Logger.log('고유번호 ' + m[1] + ' (' + m[2] + '). Script Properties의 DART_CORP_CODE에 넣어 주세요.');
-  return m[1];
+  var codes = stocks.map(function (code) {
+    var re = new RegExp('<corp_code>(\\d{8})</corp_code>\\s*<corp_name>([^<]*)</corp_name>(?:\\s*<corp_eng_name>[^<]*</corp_eng_name>)?\\s*<stock_code>' + code + '</stock_code>');
+    var m = xml.match(re);
+    if (!m) throw new Error('종목코드 ' + code + '에 해당하는 고유번호를 찾지 못했습니다.');
+    Logger.log(code + ' → 고유번호 ' + m[1] + ' (' + m[2] + ')');
+    return m[1];
+  });
+  Logger.log('DART_CORP_CODE에 넣을 값: ' + codes.join(','));
+  return codes.join(',');
 }
