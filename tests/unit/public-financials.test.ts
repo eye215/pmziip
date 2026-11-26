@@ -334,3 +334,79 @@ describe("easy explanation (초등학생 눈높이, rule-based)", () => {
     expect(explainQuarters([]).headline).toContain("없어요");
   });
 });
+
+describe("findDartCorpCode (corpCode.zip without a zip content type)", () => {
+  const xml = [
+    "<result>",
+    "<list><corp_code>99999999</corp_code><corp_name>합성전자</corp_name><corp_eng_name>SYN</corp_eng_name><stock_code>000001</stock_code><modify_date>20260101</modify_date></list>",
+    "<list><corp_code>99999998</corp_code><corp_name>합성에듀</corp_name><stock_code>000002</stock_code></list>",
+    "</result>",
+  ].join("");
+  function run(
+    body: { zip: boolean; text?: string },
+    stocks = "000001, 000002",
+  ) {
+    const logs: string[] = [];
+    let retyped = "";
+    const ctx: Record<string, unknown> = {
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (k: string) =>
+            ({ DART_API_KEY: KEY, DART_STOCK_CODE: stocks })[k] ?? null,
+        }),
+      },
+      UrlFetchApp: {
+        fetch: () => ({
+          getResponseCode: () => 200,
+          getContentText: () => body.text ?? "",
+          getBlob: () => {
+            const blob = {
+              getBytes: () => (body.zip ? [0x50, 0x4b, 3, 4] : [0x3c, 0x3f]),
+              setContentType: (t: string) => {
+                retyped = t;
+                return blob;
+              },
+            };
+            return blob;
+          },
+        }),
+      },
+      Utilities: {
+        // Mirrors Apps Script: refuses blobs that are not typed as zip.
+        unzip: () => {
+          if (retyped !== "application/zip")
+            throw new Error(
+              "잘못된 인수(ContentType)입니다. application/zip 형식이어야 합니다.",
+            );
+          return [{ getDataAsString: () => xml }];
+        },
+      },
+      Logger: { log: (m: string) => void logs.push(m) },
+    };
+    vm.createContext(ctx);
+    vm.runInContext(
+      readFileSync("tools/apps-script/coach-ga-export/Dart.gs", "utf8"),
+      ctx,
+    );
+    return {
+      result: () => vm.runInContext("findDartCorpCode()", ctx) as string,
+      logs,
+    };
+  }
+  it("retypes the blob, finds each corp code and logs progress", () => {
+    const r = run({ zip: true });
+    expect(r.result()).toBe("99999999,99999998");
+    expect(r.logs).toContain("000001 → 고유번호 99999999 (합성전자)");
+    expect(r.logs.at(-1)).toBe("DART_CORP_CODE에 넣을 값: 99999999,99999998");
+  });
+  it("reports DART's error body instead of failing to unzip", () => {
+    const r = run({
+      zip: false,
+      text: '<?xml version="1.0"?><result><status>010</status><message>등록되지 않은 키입니다.</message></result>',
+    });
+    expect(() => r.result()).toThrow("등록되지 않은 키입니다.");
+  });
+  it("names a stock code that is not listed", () => {
+    expect(() => run({ zip: true }, "000003").result()).toThrow("000003");
+  });
+});
