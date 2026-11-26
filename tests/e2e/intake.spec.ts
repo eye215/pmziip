@@ -159,3 +159,67 @@ test("Gmail·Calendar export file: review, skip items without candidates, keep l
   );
   await noOverflow(page);
 });
+
+test("shared sheet (pmzip_inbox): read with the GA sheet link, review, register", async ({
+  page,
+}) => {
+  const { createHash } = await import("node:crypto");
+  const { readFile } = await import("node:fs/promises");
+  const json = JSON.stringify(
+    JSON.parse(
+      await readFile("tests/fixtures/inbox-export.synthetic.json", "utf8"),
+    ),
+  );
+  const chunks: string[] = [];
+  for (let i = 0; i < json.length; i += 700)
+    chunks.push("|" + json.slice(i, i + 700) + "|");
+  const csv = [
+    `pmzip.inbox-export.chunks|v1|${chunks.length}|${createHash("sha256").update(json).digest("hex")}`,
+    ...chunks,
+  ]
+    .map((c) => `"${c.replaceAll('"', '""')}"`)
+    .join("\n");
+  const tabs: string[] = [];
+  await page.route("https://docs.google.com/**", (r) => {
+    tabs.push(new URL(r.request().url()).searchParams.get("sheet") ?? "");
+    return r.fulfill({
+      status: 200,
+      contentType: "text/csv",
+      headers: { "access-control-allow-origin": "*" },
+      body: csv,
+    });
+  });
+  // The GA sheet is already connected in this browser.
+  await page.goto("/");
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "pmzip:coach-ga-source:v1:00000000-0000-4000-8000-000000000010:00000000-0000-4000-8000-000000000001",
+      JSON.stringify({
+        sheetId: "SyntheticSheetId_0123456789abcdefghij",
+        projectId: "00000000-0000-4000-8000-000000000003",
+        lastSyncAt: null,
+        lastOk: null,
+        lastResult: null,
+      }),
+    ),
+  );
+  const intake = await openIntake(page);
+  await expect(
+    intake.getByRole("button", { name: "Gmail·캘린더 (시트)" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await intake.getByRole("button", { name: "시트에서 새 메일 확인" }).click();
+  await expect(intake.getByRole("status").first()).toContainText("3건 · 후보");
+  expect(tabs.filter((t) => t === "pmzip_inbox").length).toBeGreaterThanOrEqual(
+    1,
+  );
+  await intake
+    .getByRole("button", { name: "수집함에 등록 (원문 2건)" })
+    .click();
+  await expect(intake.getByRole("status")).toContainText(
+    "원문 2건을 등록했습니다.",
+  );
+  await intake.getByRole("button", { name: "시트에서 새 메일 확인" }).click();
+  await expect(intake.getByRole("status").first()).toContainText(
+    "이미 수집함에 있음 2건",
+  );
+});
