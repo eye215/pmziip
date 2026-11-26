@@ -346,6 +346,74 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
       '(label:"PMZIP" OR label:"없는라벨") newer_than:45d',
     );
   });
+  it("loads this account's labels as checkboxes; checked labels are used and kept", () => {
+    let labels = ["PMZIP", "고객요청", "운영/이슈"];
+    const m = load(
+      { INBOX_GMAIL_LABEL: "고객요청", INBOX_CALENDAR_DAYS: "0" },
+      {},
+    );
+    (m.ctx.GmailApp as { getUserLabels: unknown }).getUserLabels = () =>
+      labels.map((n) => ({ getName: () => n }));
+    const dialogs: string[] = [];
+    m.ctx.HtmlService = {
+      createHtmlOutput: (h: string) => {
+        dialogs.push(h);
+        const o = { setWidth: () => o, setHeight: () => o };
+        return o;
+      },
+    };
+    (
+      m.ctx.SpreadsheetApp as { getUi: () => Record<string, unknown> }
+    ).getUi().showModalDialog = () => {};
+    labels = [...labels, "</script><b>x"];
+    vm.runInContext("pmzipPickLabels()", m.ctx);
+    // Dialog lists every label (multi-select), current ones pre-checked, safely embedded.
+    expect(dialogs[0]).toContain('"current":["고객요청"]');
+    expect(dialogs[0]).toContain("운영/이슈");
+    expect(dialogs[0]).not.toContain("</script><b>");
+    expect(dialogs[0]).toContain("\\u003c/script>\\u003cb>x");
+    // Unknown names are dropped; picked labels saved and synced to the sheet list.
+    labels = ["PMZIP", "고객요청", "운영/이슈"];
+    const msg = vm.runInContext(
+      'pmzipSaveLabelPick(["고객요청", "없는라벨", "고객요청"], false)',
+      m.ctx,
+    );
+    expect(msg).toBe("저장했습니다: 고객요청");
+    expect(() =>
+      vm.runInContext("pmzipSaveLabelPick([], false)", m.ctx),
+    ).toThrow("하나 이상");
+    const grid = () => m.fake.grids.get("pmzip_settings")!;
+    const list = () => {
+      const at = grid().findIndex((r) => r[0] === "Gmail 라벨 목록");
+      return grid()
+        .slice(at + 1)
+        .filter((r) => r[0])
+        .map((r) => [r[0], r[1]]);
+    };
+    expect(list()).toEqual([
+      ["PMZIP", "false"],
+      ["고객요청", "true"],
+      ["운영/이슈", "false"],
+    ]);
+    // The user ticks one more box in the sheet.
+    const row = grid().findIndex((r) => r[0] === "운영/이슈");
+    grid()[row][1] = "TRUE";
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches.at(-1)).toBe(
+      '(label:"고객요청" OR label:"운영/이슈") newer_than:30d',
+    );
+    // Refresh with a removed label: checks kept by name, stale rows cleared.
+    labels = ["고객요청", "운영/이슈"];
+    vm.runInContext("pmzipRefreshLabelList_()", m.ctx);
+    expect(list()).toEqual([
+      ["고객요청", "true"],
+      ["운영/이슈", "true"],
+    ]);
+    // Nothing checked → falls back to the typed cell.
+    for (const r of grid()) if (r[1] === "true") r[1] = "false";
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches.at(-1)).toBe('(label:"고객요청") newer_than:30d');
+  });
   it("labels typed directly in the pmzip_settings tab win over Script Properties", () => {
     const m = load(
       { INBOX_GMAIL_LABEL: "PMZIP", INBOX_CALENDAR_DAYS: "0" },

@@ -33,6 +33,13 @@ export function fakeSpreadsheet(initial: Record<string, string[][]> = {}) {
           return range;
         },
         activate: () => range,
+        insertCheckboxes: () => range,
+        clearDataValidations: () => range,
+        clearContent: () => {
+          for (let i = 0; i < nr; i++)
+            for (let j = 0; j < nc; j++) put(name, r + i, c + j, "");
+          return range;
+        },
       };
       return range;
     },

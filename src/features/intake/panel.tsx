@@ -380,10 +380,10 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
               · {sheetRun.count}건
               {sheetRun.count === 0 ? " — 가져온 메일·메시지가 없습니다." : ""}
               <br />
-              가져올 라벨은 시트의 <strong>pmzip_settings</strong> 탭
-              &lsquo;Gmail 라벨&rsquo; 칸에 직접 입력해 바꿀 수 있습니다(쉼표로
-              여러 개). 바꾼 뒤 시트 메뉴 PM.zip &gt; 요구사항 메일 지금
-              가져오기를 누르세요.{" "}
+              가져올 라벨은 시트 메뉴 PM.zip &gt; 가져올 Gmail 라벨 고르기(여러
+              개 선택)에서 체크해 고른 뒤 &lsquo;저장하고 지금 가져오기&rsquo;를
+              누르세요. 고른 라벨은 <strong>pmzip_settings</strong> 탭에도
+              체크로 남습니다.{" "}
               <a
                 href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/edit`}
                 target="_blank"
