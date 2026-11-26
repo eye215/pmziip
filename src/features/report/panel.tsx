@@ -45,6 +45,33 @@ export function observeFor(state: RecordsState) {
 function ReportBody({ r }: { r: ReportContent }) {
   return (
     <>
+      <ol className="report-funnel" aria-label="흐름">
+        {(
+          [
+            ["collected", "수집한 원문", "collect"],
+            ["created", "과제로 만듦", "decide"],
+            ["go", "하기로 결정", "decide"],
+            ["released", "배포", "release"],
+            ["comparable", "전후 비교 가능", "impact"],
+            ["improvedObserved", "완료율 상승(관찰)", "impact"],
+          ] as const
+        ).map(([k, label, st]) => {
+          const max = Math.max(1, r.summary.collected, r.summary.created);
+          const v = r.summary[k];
+          return (
+            <li key={k}>
+              <span className="fn-label">{label}</span>
+              <span className="fn-track">
+                <span
+                  className={`fn-bar st-${st}`}
+                  style={{ width: `${v ? Math.max(2, (v / max) * 100) : 0}%` }}
+                />
+              </span>
+              <b>{v}</b>
+            </li>
+          );
+        })}
+      </ol>
       <dl className="report-summary">
         {summaryLabels.map(([k, label]) => (
           <div key={k}>
