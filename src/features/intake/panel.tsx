@@ -8,8 +8,18 @@ import {
   type Candidate,
   type CandidateType,
 } from "../../lib/connectors/requirement-extract";
-import { parseInboxExport } from "../../lib/connectors/inbox-export";
-import { runtime, saveRecords } from "../records/browser-store";
+import {
+  inboxExportSchema,
+  parseInboxExport,
+  type InboxExport,
+} from "../../lib/connectors/inbox-export";
+import {
+  joinSheetChunks,
+  parseCsv,
+  sheetCsvUrl,
+} from "../../lib/connectors/sheet-source";
+import { runtime, saveRecords, session } from "../records/browser-store";
+import { loadCoachSource, sha256 } from "../coach-data/store";
 import {
   applyCommand,
   type Command,
@@ -72,7 +82,16 @@ function errorText(e: unknown) {
 
 export function RequirementIntake({ state }: { state: RecordsState }) {
   const ids = useId();
-  const [mode, setMode] = useState<"paste" | "file">("paste");
+  const sheetId = (() => {
+    try {
+      return loadCoachSource(window.localStorage, session)?.sheetId ?? "";
+    } catch {
+      return "";
+    }
+  })();
+  const [mode, setMode] = useState<"paste" | "sheet" | "file">(
+    sheetId ? "sheet" : "paste",
+  );
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
   const [channel, setChannel] = useState("kakao");
@@ -131,26 +150,64 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
       },
     ]);
   }
+  function fromExport(data: InboxExport) {
+    review(
+      data.items.map((it) => ({
+        key: it.externalId,
+        title: trim(it.title || "(제목 없음)", 200),
+        body: it.body || it.title,
+        sourceType: it.channel === "gmail" ? "mail" : "other",
+        reference: it.link,
+        collectedAt: it.receivedAt,
+        requesterRole: it.fromDomain ? `보낸 곳 ${it.fromDomain}` : "",
+        channelLabel: it.channel === "gmail" ? "Gmail" : "캘린더",
+        duplicate: isDuplicate(it.body || it.title, it.link),
+        candidates: extractCandidates(`${it.title}\n\n${it.body}`),
+      })),
+    );
+  }
   async function fromFile(file: File) {
     try {
-      const data = parseInboxExport(await file.text());
-      review(
-        data.items.map((it) => ({
-          key: it.externalId,
-          title: trim(it.title || "(제목 없음)", 200),
-          body: it.body || it.title,
-          sourceType: it.channel === "gmail" ? "mail" : "other",
-          reference: it.link,
-          collectedAt: it.receivedAt,
-          requesterRole: it.fromDomain ? `보낸 곳 ${it.fromDomain}` : "",
-          channelLabel: it.channel === "gmail" ? "Gmail" : "캘린더",
-          duplicate: isDuplicate(it.body || it.title, it.link),
-          candidates: extractCandidates(`${it.title}\n\n${it.body}`),
-        })),
-      );
+      fromExport(parseInboxExport(await file.text()));
     } catch (e) {
       setMessages(null);
       setError(errorText(e));
+    }
+  }
+  /** Same link-shared sheet as GA; tab written by Inbox.gs (INBOX_SHEET=on). */
+  async function fromSheet() {
+    setBusy(true);
+    try {
+      let res: Response;
+      try {
+        res = await fetch(sheetCsvUrl(sheetId, "pmzip_inbox"), {
+          credentials: "omit",
+          cache: "no-store",
+        });
+      } catch {
+        throw new Error(
+          "시트에 연결하지 못했습니다. 네트워크를 확인해 주세요.",
+        );
+      }
+      if (!res.ok)
+        throw new Error(`시트를 읽지 못했습니다 (HTTP ${res.status}).`);
+      const body = await res.text();
+      if (/^\s*</.test(body))
+        throw new Error(
+          "시트가 링크 공유되지 않았거나 로그인 페이지가 반환되었습니다.",
+        );
+      const text = await joinSheetChunks(
+        parseCsv(body),
+        sha256,
+        "pmzip.inbox-export.chunks",
+        "pmzip_inbox",
+      );
+      fromExport(inboxExportSchema.parse(JSON.parse(text)));
+    } catch (e) {
+      setMessages(null);
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -254,13 +311,44 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         </button>
         <button
           type="button"
+          aria-pressed={mode === "sheet"}
+          onClick={() => setMode("sheet")}
+        >
+          Gmail·캘린더 (시트)
+        </button>
+        <button
+          type="button"
           aria-pressed={mode === "file"}
           onClick={() => setMode("file")}
         >
           Gmail·캘린더 파일
         </button>
       </div>
-      {mode === "paste" ? (
+      {mode === "sheet" ? (
+        <>
+          <p className="subtle">
+            GA와 같은 공유 시트의 pmzip_inbox 탭(Inbox.gs, 스크립트 속성
+            INBOX_SHEET=on)에서 메일·회의 메모를 읽습니다. 링크가 있는 누구나 볼
+            수 있으므로 인용·서명은 빼고 이메일·전화번호는 가린 상태로
+            기록됩니다.
+          </p>
+          {sheetId ? (
+            <div className="actions">
+              <button
+                type="button"
+                onClick={() => void fromSheet()}
+                disabled={busy}
+              >
+                시트에서 새 메일 확인
+              </button>
+            </div>
+          ) : (
+            <p className="empty-state">
+              먼저 백업·가져오기에서 GA 시트를 연결해 주세요.
+            </p>
+          )}
+        </>
+      ) : mode === "paste" ? (
         <>
           <div className="field-grid">
             <div className="field">
