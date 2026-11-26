@@ -66,12 +66,14 @@ export function parseCsv(text: string): string[][] {
 export async function joinSheetChunks(
   rows: string[][],
   sha256: (text: string) => Promise<string>,
+  expectedHeader = CHUNK_HEADER,
+  tab = SHEET_TAB,
 ): Promise<string> {
   const cells = rows.map((r) => r[0] ?? "").filter((c) => c !== "");
   const header = cells[0]?.split("|") ?? [];
-  if (header[0] !== CHUNK_HEADER || header[1] !== "v1")
+  if (header[0] !== expectedHeader || header[1] !== "v1")
     throw new Error(
-      `시트의 ${SHEET_TAB} 탭이 PM.zip 내보내기 형식이 아닙니다. 공유 설정과 탭 이름을 확인해 주세요.`,
+      `시트의 ${tab} 탭이 PM.zip 내보내기 형식이 아닙니다. 공유 설정과 탭 이름을 확인해 주세요.`,
     );
   const expected = Number(header[2]);
   const chunks = cells.slice(1);

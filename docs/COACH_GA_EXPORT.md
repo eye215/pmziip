@@ -63,6 +63,50 @@ PM.zip은 GA나 Apps Script에 접속하지 않고, 시트에 쓰지도 않는�
 - [ ] 점수 값이 정확히 `1`~`5`인지 확인한다. `5.0` 같은 값은 "1~5가 아닌 점수 값"으로 분리된다.
 - [ ] PM.zip에서 "동기화 완료"가 뜨는지 확인한다. "공개 링크로 공유되지 않았거나…" 오류가 뜨면 8단계 공유 설정을 확인한다.
 
+## 공시 실적 (DART) 추가 설정
+
+같은 스프레드시트와 같은 Apps Script 프로젝트에 `Dart.gs`를 추가한다. 매일 실행되는 `dailyExport`가 GA 수집 뒤에 DART 분기 실적도 함께 갱신한다.
+
+1. Apps Script 편집기에서 **파일 추가 → 스크립트**로 `Dart`를 만든다. 그다음 [`Dart.gs`](../tools/apps-script/coach-ga-export/Dart.gs) 내용을 붙여넣는다. `appsscript.json`도 최신본으로 바꾼다. 외부 요청 권한(`script.external_request`)이 추가되었다.
+2. 스크립트 속성에 다음을 추가한다.
+   - `DART_API_KEY`: OpenDART 인증키. **채팅, 저장소, 이슈에 쓰지 않는다.**
+   - `DART_STOCK_CODE`: 6자리 종목코드. 여러 회사를 보려면 쉼표로 구분한다(예: `000000,111111`).
+3. `findDartCorpCode`를 실행한다. 실행 로그 마지막 줄의 "DART_CORP_CODE에 넣을 값"을 스크립트 속성 `DART_CORP_CODE`에 그대로 넣는다. 여러 회사면 쉼표로 구분된 값이다.
+4. `exportDartToSheet`를 실행한다. `pmzip_dart`, `pmzip_dart_summary` 탭이 생기는지 확인한다.
+5. `installDailyTrigger`를 다시 실행한다. 이제 GA와 DART가 함께 매일 갱신된다.
+6. PM.zip **백업·가져오기 → 공시 실적 (DART)**에서 **GA 시트와 같은 시트 사용 → 공시 시트 연결**을 누른다.
+
+화면:
+
+- **회사**: 회사를 고를 수 있다. 자회사가 없어 별도 재무제표만 공시하는 회사는 자동으로 '별도' 기준으로 바뀐다.
+- **쉽게 보기 (기본)**: 최근 분기의 매출, 1년 전 같은 분기 대비, 남은 돈(이익) 또는 손해, 100원당 남는 돈, 최근 4개 분기 추세를 초등학생 눈높이 문장으로 보여 준다.
+  - 규칙 기반 자동 설명(`easy-fin-1`)이며 AI는 쓰지 않는다. 숫자는 모두 공시 값에서 코드로 계산한다.
+  - 원인은 추측하지 않는다.
+  - 실제 AI 문장 다듬기를 붙이려면 LLM API 키와 서버, 비용 승인이 필요하다. 그때도 숫자와 사실은 이 결과를 그대로 쓰고, 사용자 확인 후 확정한다.
+- **표로 보기**: 분기 표와 공시 원문 링크를 보여 준다.
+
+알아 둘 것:
+
+- 단일회사 주요계정 API(`fnlttSinglAcnt`)에서 매출액, 영업이익, 당기순이익을 연결·별도 기준으로 최근 3개 연도 받는다.
+- 분기보고서와 반기보고서의 금액은 해당 분기 3개월 값이다. **4분기는 사업보고서 연간값에서 3분기 누적값을 뺀 계산값**이며 `*`로 표시한다.
+- 아직 공시되지 않은 분기는 없는 값으로 두고 만들어 내지 않는다. `-`나 빈 금액은 미집계로 두고 0으로 바꾸지 않는다.
+- 공시에는 **국가·제품별 판매가 없다**. Coach 국가별 지표와의 상관·인과 분석에는 쓰지 않는다. 화면에 이 점을 명시한다.
+- API 키는 Apps Script 안에만 있다. 시트와 PM.zip에는 키가 기록되지 않는다(테스트로 확인).
+- 처음 실행하면 IR 실적 발표 자료와 분기 매출을 한 번 대조한다. 특히 분기와 누적 금액의 구분을 확인한다.
+
+## 국가별 제조사 점유율 (StatCounter) 추가 설정
+
+[StatCounter Global Stats](https://gs.statcounter.com/)의 국가별·월별 **모바일 제조사 이용 점유율**이다. 판매량이나 출하량이 아니라 웹 트래픽 기반이다. 라이선스는 CC BY-SA 3.0이며, 공유하거나 보고서에 쓸 때 출처를 표기한다.
+
+1. 같은 Apps Script 프로젝트에 **파일 추가 → 스크립트**로 `StatCounter`를 만들고 [`StatCounter.gs`](../tools/apps-script/coach-ga-export/StatCounter.gs)를 붙여넣는다.
+2. 스크립트 속성 `STATCOUNTER_COUNTRIES`에 ISO 2자리 국가 코드를 넣는다. 예: `KR,US,IN,BR`. Coach GA의 `countryId`와 같은 코드를 쓰면 같은 달 Coach 국가별 UU가 옆에 표시된다.
+3. `exportStatCounterToSheet`를 실행한다. `pmzip_statcounter`, `pmzip_statcounter_summary` 탭이 생기는지 확인한다. 이후 `dailyExport`가 매일 함께 갱신한다. 국가당 요청은 1회이고 요청 사이에 1.5초씩 쉰다.
+4. PM.zip **백업·가져오기 → 국가별 제조사 점유율 → GA 시트와 같은 시트 사용 → 점유율 시트 연결**을 누른다.
+
+- StatCounter에는 공식 API가 없다. 기본 주소는 사이트의 "Download Data" CSV 링크 형식을 따른 것이라 **미검증**이다. 실패하면 시트 `pmzip_statcounter`의 경고나 PM.zip 동기화 오류에 국가별 HTTP 오류가 나온다. 이때 사이트에서 받은 CSV 링크 형식으로 스크립트 속성 `STATCOUNTER_URL_TEMPLATE`을 넣는다. 자리표시자는 `{CODE}`, `{FROM}`, `{TO}`, `{FROM_DASH}`, `{TO_DASH}`이다.
+- **예비 경로**: gs.statcounter.com에서 Mobile Vendor Market Share, 국가, Monthly로 설정하고 Download Data로 CSV를 받는다. PM.zip의 "StatCounter CSV 직접 올리기"에 국가 코드와 함께 올린다.
+- 화면에는 제조사를 고르면 국가별 최근 월 점유율, 1년 전 같은 달, 변화(%p)가 나온다. GA 한 달 전체 기간을 가져온 경우에는 그달 점유율과 Coach 진입 UU를 함께 표시한다. 상관이나 인과는 계산하거나 주장하지 않는다.
+
 ## 검증 상태
 
 - **단위 테스트**
@@ -73,7 +117,15 @@ PM.zip은 GA나 Apps Script에 접속하지 않고, 시트에 쓰지도 않는�
   - 파일 가져오기
   - 시트 연결 → 자동 동기화 → 재방문 시 중복 없음 → 실패 시 기존 데이터 유지 → 연결 해제 후 데이터 유지
   - 시트 응답은 합성 CSV로 대체했다.
+- **DART 테스트**
+  - 단위: `Dart.gs`를 합성 DART 응답으로 실행해 분기값, 4분기 계산, 미공시 분기, 미집계, 오류 시 미기록, API 키 비노출을 확인한다. 분기 표의 영업이익률·전년동기 대비(YoY) 계산과 N/A 처리, 같은 공시의 중복 저장 방지도 확인한다.
+  - e2e: 합성 CSV로 시트 연결 → 분기 표 → 재동기화 시 변경 없음을 확인한다.
+- **StatCounter 테스트**
+  - 단위: `StatCounter.gs`를 합성 CSV로 실행해 국가별 1회 요청, 실패 국가 경고, 시트 왕복을 확인한다. CSV 파싱 오류, 1년 전 대비 %p, 값이 바뀔 때만 추가하는 저장도 확인한다.
+  - e2e: CSV 업로드 → 표 → 같은 달 Coach UU → 잘못된 국가 코드 거부를 확인한다.
 - **미검증**
+  - StatCounter 자동 다운로드 URL
+  - 실제 OpenDART 호출, `findDartCorpCode`(corpCode.zip 해제)
   - 실제 GA 속성에서 Apps Script 실행
   - 실제 Google 시트 gviz CSV의 응답 형식과 브라우저 교차 출처(CORS) 허용. 개발 환경에서 docs.google.com 접속이 차단되어 확인하지 못했다.
   - 실제 수치와 기존 보고서 비교
