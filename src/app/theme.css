@@ -588,3 +588,220 @@ details > summary {
     grid-template-columns: 96px minmax(0, 1fr) 36px;
   }
 }
+
+/* Menu icons + inbox badge (mobile mock m1–m5) */
+.workspace-nav button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-icon {
+  flex: none;
+  opacity: 0.85;
+}
+.nav-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--st-collect);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .workspace-nav button {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .nav-badge {
+    position: absolute;
+    top: 3px;
+    left: calc(50% + 6px);
+    min-width: 17px;
+    height: 17px;
+    line-height: 17px;
+    font-size: 10px;
+  }
+}
+
+/* Home: five stage tiles + today */
+.stage-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: -8px 0 20px;
+}
+.stage-tiles > div {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--st);
+  padding: 10px 6px 9px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+.stage-tiles dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.stage-tiles dt {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--st);
+  white-space: nowrap;
+}
+.st-collect {
+  --st: var(--st-collect);
+}
+.st-decide {
+  --st: var(--st-decide);
+}
+.st-change {
+  --st: var(--st-change);
+}
+.st-release {
+  --st: var(--st-release);
+}
+.st-impact {
+  --st: var(--st-impact);
+}
+.today {
+  margin-bottom: 24px;
+}
+.today h2 {
+  font-size: 17px;
+  margin: 0 4px 10px;
+}
+.today h2 span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.today ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.today-item {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+}
+.today-item:hover:not(:disabled) {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1.5px var(--st),
+    var(--shadow);
+}
+.today-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  flex: none;
+  background: color-mix(in srgb, var(--st) 14%, white);
+  position: relative;
+}
+.today-dot::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: var(--st);
+}
+.today-text {
+  display: grid;
+  min-width: 0;
+}
+.today-text b {
+  font-size: 14.5px;
+}
+.today-text span {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.today-go {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 18px;
+}
+@media (max-width: 480px) {
+  .stage-tiles {
+    gap: 6px;
+  }
+  .stage-tiles dd {
+    font-size: 19px;
+  }
+  .stage-tiles dt {
+    font-size: 10.5px;
+  }
+}
+
+/* Mobile: compact page header and filter row (mock m1) */
+@media (max-width: 560px) {
+  main {
+    padding-top: 18px;
+  }
+  .intro {
+    margin-bottom: 12px;
+  }
+  .intro .eyebrow,
+  .intro > p:last-child {
+    display: none;
+  }
+  .intro h1 {
+    font-size: 22px;
+  }
+  .local-note {
+    font-size: 11.5px;
+    margin-bottom: 10px;
+  }
+  .filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 0;
+    margin-bottom: 14px;
+    background: transparent;
+    box-shadow: none;
+  }
+  .filters label {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  .filters select,
+  .filters input {
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    border-color: transparent;
+    font-size: 14px;
+    padding-left: 12px;
+    padding-right: 8px;
+  }
+  .toolbar {
+    margin-bottom: 14px;
+  }
+}
