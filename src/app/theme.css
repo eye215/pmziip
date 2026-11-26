@@ -843,3 +843,98 @@ details > summary {
     gap: 8px;
   }
 }
+
+/* Checkboxes: custom box, ink when checked (replaces the native grey box) */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #c3c7d6;
+  border-radius: 7px;
+  background: var(--surface) center / 14px 14px no-repeat;
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+input[type="checkbox"]:checked {
+  border-color: var(--ink);
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.4 5.8 10 11 4.2' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:focus-visible {
+  outline: 3px solid rgba(91, 124, 250, 0.35);
+  outline-offset: 2px;
+}
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  border-color: #d6d9e4;
+  background-color: var(--sunken);
+}
+input[type="checkbox"]:checked:disabled {
+  background-color: #d6d9e4;
+  border-color: #d6d9e4;
+}
+.check > input[type="checkbox"] {
+  margin-top: 11px;
+}
+.check {
+  cursor: pointer;
+}
+
+/* Filter toggles read as chips: whole pill turns ink when on */
+.toolbar .check,
+.work-filters ~ .actions .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.toolbar .check > input,
+.work-filters ~ .actions .check > input {
+  align-self: center;
+  margin-top: 0;
+  width: 20px;
+  height: 20px;
+}
+.toolbar .check:has(input:checked),
+.work-filters ~ .actions .check:has(input:checked) {
+  background: var(--ink);
+  box-shadow: none;
+  color: #fff;
+}
+.toolbar .check:has(input:checked) > input,
+.work-filters ~ .actions .check:has(input:checked) > input {
+  border-color: #fff;
+  background-color: transparent;
+}
+.toolbar .check:has(input:focus-visible),
+.work-filters ~ .actions .check:has(input:focus-visible) {
+  outline: 3px solid rgba(91, 124, 250, 0.35);
+  outline-offset: 2px;
+}
+
+/* Selected intake items: the card itself shows it, quietly */
+.intake-review > article.record-row:has(> .check input:checked) {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.intake-candidates li:has(input[type="checkbox"]:checked:not(:disabled)) {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px #bfd0ff;
+}
