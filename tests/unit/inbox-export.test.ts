@@ -24,6 +24,7 @@ function run() {
   });
   const searches: string[] = [];
   const ctx: Record<string, unknown> = {
+    Logger: { log: () => {} },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k: string) => ({ INBOX_GMAIL_LABEL: "PMZIP" })[k] ?? null,
@@ -124,6 +125,7 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
       getRange: () => {
         const r = {
           setNumberFormat: () => r,
+          setValue: (v: string) => void sheets.set(name + "!B1", [[String(v)]]),
           setValues: (rows: string[][]) =>
             void sheets.set(
               name,
@@ -134,6 +136,7 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
       },
     });
     const ctx: Record<string, unknown> = {
+      Logger: { log: () => {} },
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (k: string) => (k === "INBOX_SHEET" ? "on" : null),
@@ -170,7 +173,6 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
         Charset: { UTF_8: "UTF_8" },
       },
       Session: { getScriptTimeZone: () => "Asia/Seoul" },
-      Logger: { log: () => {} },
       SpreadsheetApp: {
         getActiveSpreadsheet: () => ({
           getSheetByName: sheet,
@@ -221,6 +223,7 @@ describe("installInboxTrigger", () => {
       }),
     });
     const ctx: Record<string, unknown> = {
+      Logger: { log: () => {} },
       ScriptApp: {
         getProjectTriggers: () => [
           { getHandlerFunction: () => "exportInboxToSheet" },
@@ -230,7 +233,6 @@ describe("installInboxTrigger", () => {
           void deleted.push(t.getHandlerFunction()),
         newTrigger: builder,
       },
-      Logger: { log: () => {} },
       // Session.getEffectiveUser would require userinfo.email: must not be used.
       Session: new Proxy(
         {},
@@ -274,6 +276,7 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
       },
     };
     const ctx: Record<string, unknown> = {
+      Logger: { log: () => {} },
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (k: string) => store[k] ?? null,
