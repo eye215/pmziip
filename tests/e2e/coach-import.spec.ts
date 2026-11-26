@@ -370,6 +370,11 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
   );
   await expect(market.getByRole("status")).toContainText("XA 점유율 새 값 6개");
   await upload("XB", '"Date","VendorA","VendorB"\n2026-10,10,90');
+  // Wait for the save to finish (it clears the CSV box) before the next upload.
+  await expect(market.getByRole("status")).toContainText("XB 점유율 새 값 2개");
+  await expect(
+    market.getByLabel("또는 CSV 붙여넣기", { exact: true }),
+  ).toHaveValue("");
   await upload("XB", '"Date","VendorA","VendorB"\n2026-10,10,90');
   await expect(market.getByRole("status")).toContainText(
     "새 값 0개 · 변경 없음 2개",
@@ -383,6 +388,9 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
   await expect(xa).toContainText("+5.0%p");
   await expect(xa).toContainText("600");
   await expect(table.getByRole("row", { name: /XB/ })).toContainText("—");
+  await expect(
+    market.getByLabel("또는 CSV 붙여넣기", { exact: true }),
+  ).toHaveValue("");
 
   await upload("Korea", '"Date","VendorA"\n2026-10,1');
   await expect(market.getByRole("alert")).toContainText("영문 대문자 2자리");
