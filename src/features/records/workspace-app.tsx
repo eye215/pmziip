@@ -2,6 +2,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { projectMonth } from "../../lib/time";
+import { MeasurementWorkspace } from "../measurement/workspace";
+import { readiness } from "../measurement/model";
+import { SourceSplitReview } from "../measurement/source-split";
 import {
   useRecords,
   useView,
@@ -51,6 +54,13 @@ export function WorkspaceApp() {
   function navigate(values: Record<string, string>) {
     if (editor && !window.confirm("작성 중인 내용을 저장하지 않고 이동할까요?"))
       return;
+    if (
+      !window.dispatchEvent(
+        new Event("pmzip:before-view", { cancelable: true }),
+      )
+    )
+      return;
+    window.dispatchEvent(new Event("pmzip:view-accepted"));
     setEditor(null);
     setNotice("");
     changeView(values);
@@ -241,7 +251,11 @@ export function WorkspaceApp() {
               ].map(([id, label]) => (
                 <button
                   key={id}
-                  aria-current={tab === id ? "page" : undefined}
+                  aria-current={
+                    tab === id || (id === "work" && tab === "measurement")
+                      ? "page"
+                      : undefined
+                  }
                   onClick={() => navigate({ tab: id })}
                 >
                   {label}
@@ -385,6 +399,18 @@ export function WorkspaceApp() {
                           >
                             과제 보기
                           </button>
+                          <button
+                            onClick={() =>
+                              navigate({
+                                tab: "measurement",
+                                scope: `project:${project.id}`,
+                                panel: "plans",
+                                work: "",
+                              })
+                            }
+                          >
+                            지표·전략
+                          </button>
                         </div>
                       </article>
                     ))}
@@ -506,6 +532,9 @@ export function WorkspaceApp() {
                     <h3>{source.title}</h3>
                     <p>{source.rawText.slice(0, 160)}</p>
                     <SourceDetails source={source} state={state} />
+                    {source.status !== "archived" && (
+                      <SourceSplitReview state={state} sourceId={source.id} />
+                    )}
                     <div className="actions">
                       <button onClick={() => open("source", source.id)}>
                         수정
@@ -706,6 +735,29 @@ export function WorkspaceApp() {
                             중복 검토·병합
                           </button>
                         )}
+                        <button
+                          onClick={() =>
+                            navigate({
+                              tab: "measurement",
+                              scope: `project:${work.projectId}`,
+                              panel: "plans",
+                              work: work.id,
+                            })
+                          }
+                        >
+                          측정 계획
+                        </button>
+                        <span className="subtle">
+                          측정 준비:{" "}
+                          {
+                            {
+                              not_ready: "미준비",
+                              partial: "일부 누락",
+                              ready: "확인됨",
+                              waived: "예외 사유 있음",
+                            }[readiness(state, work.id).status]
+                          }
+                        </span>
                         {work.status === "archived" && (
                           <p className="subtle">
                             수정에서 업무 상태를 바꾸면 복원됩니다.
@@ -716,6 +768,16 @@ export function WorkspaceApp() {
                   </article>
                 ))}
               </section>
+            )}
+            {tab === "measurement" && (
+              <MeasurementWorkspace
+                state={state}
+                projectId={scopeKind === "project" ? scopeId : undefined}
+                month={month}
+                panel={view.get("panel") || "plans"}
+                workId={view.get("work") || undefined}
+                navigate={navigate}
+              />
             )}
             {tab === "data" && (
               <section className="panel">

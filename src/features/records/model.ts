@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  measurementStateSchema,
+  emptyMeasurement,
+  validateMeasurementRelations,
+} from "../measurement/schema";
 import { demoWorkspace } from "../../lib/demo";
 import { workspaceSchema, projectSchema } from "../../lib/schema";
 import { projectMonth } from "../../lib/time";
@@ -93,7 +98,7 @@ const initiativeSchema = initiativeInput.extend({
   createdAt: instant,
   updatedAt: instant,
 });
-export const stateSchema = z
+export const stateSchemaV1 = z
   .object({
     schemaVersion: z.literal(1),
     revision: z.number().int().nonnegative(),
@@ -180,6 +185,54 @@ export const stateSchema = z
       if (!s.initiatives.some((x) => x.id === row.initiativeId))
         fail("레거시 매핑 대상이 없습니다.");
   });
+export const stateSchema = z
+  .object({
+    ...stateSchemaV1.shape,
+    schemaVersion: z.literal(2),
+    measurement: measurementStateSchema,
+  })
+  .strict()
+  .superRefine((s, ctx) => {
+    const { measurement, ...base } = s;
+    const old = stateSchemaV1.safeParse({ ...base, schemaVersion: 1 });
+    if (!old.success)
+      for (const issue of old.error.issues)
+        ctx.addIssue({
+          code: "custom",
+          path: issue.path,
+          message: issue.message,
+        });
+    const allIds = [
+      s.workspace.id,
+      ...s.workspace.clients.map((x) => x.id),
+      ...s.workspace.projects.map((x) => x.id),
+      ...s.sources.map((x) => x.id),
+      ...s.initiatives.map((x) => x.id),
+      ...s.audit.map((x) => x.id),
+      ...measurement.metrics.map((x) => x.id),
+      ...measurement.metricVersions.map((x) => x.id),
+      ...measurement.plans.map((x) => x.id),
+      ...measurement.strategies.map((x) => x.id),
+    ];
+    if (new Set(allIds).size !== allIds.length)
+      ctx.addIssue({ code: "custom", message: "기록 ID가 중복됩니다." });
+    validateMeasurementRelations(s, ctx);
+  });
+export function decodeState(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === 1
+  ) {
+    return stateSchema.parse({
+      ...stateSchemaV1.parse(value),
+      schemaVersion: 2,
+      measurement: emptyMeasurement(),
+    });
+  }
+  return stateSchema.parse(value);
+}
 export type RecordsState = z.infer<typeof stateSchema>;
 export type Source = RecordsState["sources"][number];
 export type Initiative = RecordsState["initiatives"][number];
@@ -202,7 +255,8 @@ export function createState(session: Session): RecordsState {
   if (session.mode !== "synthetic" || session.workspaceId !== demoWorkspace.id)
     throw new Error("지원되지 않는 합성 워크스페이스입니다.");
   return stateSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
+    measurement: emptyMeasurement(),
     revision: 0,
     ownerId: idSchema.parse(session.ownerId),
     workspace: structuredClone(demoWorkspace),
