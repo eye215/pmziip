@@ -12,6 +12,7 @@ import { MarketSharePanel } from "../market-share/panel";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
+import { ReportPanel } from "../report/panel";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -871,6 +872,7 @@ export function WorkspaceApp() {
               <CoachDataPanel projects={state.workspace.projects} />
             )}
             {tab === "data" && <PublicFinancialsPanel />}
+            {tab === "perf" && <ReportPanel state={state} />}
             {tab === "perf" && (
               <PerformanceView projects={state.workspace.projects} />
             )}

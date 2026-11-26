@@ -3,27 +3,14 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { Initiative, RecordsState } from "./model";
 import { caseStudy, caseStudyText, dayIn, missingHint } from "./case-study";
-import { session } from "./browser-store";
-import { latestSnapshots, loadCoach } from "../coach-data/store";
+import { readWindows } from "../coach-data/release-read";
 import {
   compareRows,
   formatChange,
   releaseSummary,
-  releaseWindows,
   type CompareWindow,
 } from "../coach-data/release-compare";
 
-function readWindows(projectId: string, releaseDay: string) {
-  try {
-    const list = latestSnapshots(
-      loadCoach(window.localStorage, session).state,
-      projectId,
-    ).map((x) => x.latest);
-    return releaseWindows(list, releaseDay);
-  } catch {
-    return [];
-  }
-}
 
 function ReleaseCompare({ windows }: { windows: CompareWindow[] }) {
   const shown = windows
