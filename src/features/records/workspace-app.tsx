@@ -6,6 +6,7 @@ import { MeasurementWorkspace } from "../measurement/workspace";
 import { readiness } from "../measurement/model";
 import { SourceSplitReview } from "../measurement/source-split";
 import { CoachDataPanel } from "../coach-data/panel";
+import { DeviceLinkHandler, DeviceLinkPanel } from "../coach-data/device-link";
 import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
 import { PerformanceView } from "../performance/view";
@@ -860,6 +861,8 @@ export function WorkspaceApp() {
                 </details>
               </section>
             )}
+            <DeviceLinkHandler projects={state.workspace.projects} />
+            {tab === "data" && <DeviceLinkPanel />}
             {tab === "data" && (
               <CoachDataPanel projects={state.workspace.projects} />
             )}

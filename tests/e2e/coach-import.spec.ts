@@ -428,3 +428,72 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
   await expect(table.getByRole("row").nth(1)).toContainText("XA");
   await noOverflow(page);
 });
+
+test("connection link: another browser connects all sheets and syncs", async ({
+  page,
+  browser,
+}, info) => {
+  const csv = await sheetCsv();
+  const route = async (p: Page) =>
+    p.route("https://docs.google.com/**", (r) => {
+      const tab = new URL(r.request().url()).searchParams.get("sheet");
+      return r.fulfill({
+        status: tab === "pmzip_export" ? 200 : 404,
+        contentType: "text/csv",
+        headers: { "access-control-allow-origin": "*" },
+        body: tab === "pmzip_export" ? csv : "not found",
+      });
+    });
+  await route(page);
+  const panel = await openPanel(page);
+  await expect(
+    page.getByRole("region", { name: "다른 기기에서 보기" }),
+  ).toHaveCount(0);
+  await panel
+    .getByLabel("GA 스프레드시트 링크 또는 ID", { exact: true })
+    .fill(SHEET_ID);
+  await panel.getByRole("button", { name: "시트 연결", exact: true }).click();
+  await expect(panel).toContainText("저장된 기간 2개");
+  await openPanel(page);
+  const share = page.getByRole("region", { name: "다른 기기에서 보기" });
+  const link = await share
+    .getByLabel("연결 링크", { exact: true })
+    .inputValue();
+  expect(link).toContain("#connect=");
+  expect(new URL(link).search).toBe("?tab=data");
+
+  // A fresh browser (no storage) opens the link.
+  const other = await browser.newContext({
+    ...(info.project.use.viewport
+      ? { viewport: info.project.use.viewport }
+      : {}),
+  });
+  const phone = await other.newPage();
+  await phone.route("**/*", async (r) => {
+    const host = new URL(r.request().url()).hostname;
+    if (host === "docs.google.com") return r.fallback();
+    if (!["127.0.0.1", "localhost"].includes(host))
+      throw new Error("Unexpected external request: " + host);
+    await r.continue();
+  });
+  await route(phone);
+  await phone.goto(link);
+  await expect(phone.getByRole("status").first()).toContainText(
+    "이 기기를 시트에 연결했습니다 (GA)",
+  );
+  expect(new URL(phone.url()).hash).toBe("");
+  const phonePanel = phone.getByRole("region", {
+    name: "Galaxy Coach GA 가져오기",
+  });
+  await expect(phonePanel).toContainText("저장된 기간 2개");
+  await phone
+    .getByRole("navigation", { name: "워크스페이스 메뉴" })
+    .getByRole("button", { name: "성과", exact: true })
+    .click();
+  await expect(
+    phone
+      .getByRole("region", { name: "Galaxy Coach 이용" })
+      .locator(".stat-row"),
+  ).toContainText("훈련 완료율 (UU)75%");
+  await other.close();
+});
