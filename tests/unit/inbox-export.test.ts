@@ -81,7 +81,7 @@ function run() {
 describe("Inbox.gs → PM.zip intake contract", () => {
   it("exports labelled mail and calendar notes; sender reduced to domain", () => {
     const { data, searches } = run();
-    expect(searches).toEqual(['label:"PMZIP" newer_than:30d']);
+    expect(searches).toEqual(['(label:"PMZIP") newer_than:30d']);
     const file = inboxExportSchema.parse(data);
     expect(file.items.map((i) => i.channel)).toEqual(["gmail", "calendar"]);
     expect(file.items[0].fromDomain).toBe("@example.invalid");
@@ -249,5 +249,102 @@ describe("installInboxTrigger", () => {
     vm.runInContext("installInboxTrigger()", ctx);
     expect(deleted).toEqual(["exportInboxToSheet"]);
     expect(created).toEqual(["exportInboxToSheet"]);
+  });
+});
+
+describe("Gmail target: labels or search, set from the PM.zip menu", () => {
+  function load(
+    props: Record<string, string>,
+    extra: Record<string, unknown> = {},
+  ) {
+    const searches: string[] = [];
+    const store = { ...props };
+    const alerts: string[] = [];
+    let answer = "";
+    const ui = {
+      ButtonSet: { OK_CANCEL: "OK_CANCEL", YES_NO: "YES_NO" },
+      Button: { OK: "OK", YES: "YES" },
+      prompt: () => ({
+        getSelectedButton: () => "OK",
+        getResponseText: () => answer,
+      }),
+      alert: (m: string) => {
+        alerts.push(m);
+        return "YES";
+      },
+    };
+    const ctx: Record<string, unknown> = {
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (k: string) => store[k] ?? null,
+          setProperty: (k: string, v: string) => void (store[k] = v),
+          deleteProperty: (k: string) => void delete store[k],
+        }),
+      },
+      GmailApp: {
+        search: (q: string) => {
+          searches.push(q);
+          return [];
+        },
+        getUserLabels: () => [
+          { getName: () => "PMZIP" },
+          { getName: () => "고객요청" },
+        ],
+      },
+      CalendarApp: {
+        getDefaultCalendar: () => ({ getId: () => "c", getEvents: () => [] }),
+      },
+      SpreadsheetApp: { getUi: () => ui },
+      ...extra,
+    };
+    vm.createContext(ctx);
+    for (const f of ["Inbox.gs", "Menu.gs"])
+      vm.runInContext(
+        readFileSync(`tools/apps-script/coach-ga-export/${f}`, "utf8"),
+        ctx,
+      );
+    return {
+      ctx,
+      searches,
+      store,
+      alerts,
+      answer: (a: string) => void (answer = a),
+    };
+  }
+  it("searches several labels, or the advanced query as is", () => {
+    const a = load({
+      INBOX_GMAIL_LABEL: "PMZIP, 고객요청",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    vm.runInContext("buildInboxExport_()", a.ctx);
+    expect(a.searches).toEqual([
+      '(label:"PMZIP" OR label:"고객요청") newer_than:30d',
+    ]);
+    const b = load({
+      INBOX_GMAIL_QUERY: "from:@example.invalid 요청",
+      INBOX_DAYS: "60",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    const file = JSON.parse(
+      JSON.stringify(vm.runInContext("buildInboxExport_()", b.ctx)),
+    );
+    expect(b.searches).toEqual(["(from:@example.invalid 요청) newer_than:60d"]);
+    expect(file.query.gmailLabel).toBe("query: from:@example.invalid 요청");
+  });
+  it("menu saves labels (clearing an old query), warns on unknown labels, validates days", () => {
+    const m = load({ INBOX_GMAIL_QUERY: "old" });
+    m.answer(" PMZIP , 없는라벨 ");
+    vm.runInContext("pmzipSetInboxLabels()", m.ctx);
+    expect(m.store.INBOX_GMAIL_LABEL).toBe("PMZIP, 없는라벨");
+    expect(m.store.INBOX_GMAIL_QUERY).toBeUndefined();
+    expect(m.alerts.at(-1)).toContain(
+      "이 계정에 없는 라벨이 있습니다 — 없는라벨",
+    );
+    m.answer("999");
+    vm.runInContext("pmzipSetInboxDays()", m.ctx);
+    expect(m.store.INBOX_DAYS).toBeUndefined();
+    m.answer("45");
+    vm.runInContext("pmzipSetInboxDays()", m.ctx);
+    expect(m.store.INBOX_DAYS).toBe("45");
   });
 });
