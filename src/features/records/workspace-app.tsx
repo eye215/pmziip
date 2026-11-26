@@ -167,6 +167,9 @@ export function WorkspaceApp() {
       return projectMonth(s.collectedAt, "Asia/Seoul") === month;
     }) || [];
 
+  const freshCount =
+    state?.sources.filter((s) => s.status === "inbox").length ?? 0;
+
   return (
     <>
       <a className="skip" href="#main">
@@ -275,13 +278,12 @@ export function WorkspaceApp() {
                   }
                   onClick={() => navigate({ tab: id })}
                 >
-                  {label.includes("·") ? (
-                    <>
-                      {label.split("·")[0]}·<wbr />
-                      {label.split("·")[1]}
-                    </>
-                  ) : (
-                    label
+                  <NavIcon id={id} />
+                  <span className="nav-label">{label}</span>
+                  {id === "inbox" && freshCount > 0 && (
+                    <span className="nav-badge" aria-hidden="true">
+                      {freshCount > 99 ? "99+" : freshCount}
+                    </span>
                   )}
                 </button>
               ))}
@@ -329,7 +331,7 @@ export function WorkspaceApp() {
             )}
             {tab === "projects" && (
               <>
-                <HomeFlow state={state} month={month} />
+                <HomeFlow state={state} month={month} go={navigate} />
                 <section
                   className="overview"
                   aria-labelledby="projects-heading"
@@ -893,5 +895,33 @@ export function WorkspaceApp() {
         )}
       </main>
     </>
+  );
+}
+
+const navPaths: Record<string, string> = {
+  projects: "M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z",
+  inbox:
+    "M4 13h4l1.5 2.5h5L16 13h4M5.5 6h13L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z",
+  work: "M5 5h14v14H5zM8.5 12l2.5 2.5 4.5-5",
+  perf: "M5 19V11M10 19V6M15 19v-5M20 19V9M3 19.5h18",
+  data: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8",
+};
+function NavIcon({ id }: { id: string }) {
+  return (
+    <svg
+      className="nav-icon"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      aria-hidden="true"
+      focusable="false"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={navPaths[id]} />
+    </svg>
   );
 }
