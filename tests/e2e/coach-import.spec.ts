@@ -250,3 +250,64 @@ test("linked sheet: connect, auto-sync once per visit, idempotent, failure keeps
   ).toBeVisible();
   await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
 });
+
+const FIN_SHEET = "SyntheticFinSheet_0123456789abcdefghij";
+async function finCsv() {
+  const json = JSON.stringify(
+    JSON.parse(
+      await readFile("tests/fixtures/public-financials.synthetic.json", "utf8"),
+    ),
+  );
+  const chunks: string[] = [];
+  for (let i = 0; i < json.length; i += 900)
+    chunks.push("|" + json.slice(i, i + 900) + "|");
+  const hash = createHash("sha256").update(json, "utf8").digest("hex");
+  return [
+    `pmzip.public-financials.chunks|v1|${chunks.length}|${hash}`,
+    ...chunks,
+  ]
+    .map((c) => `"${c.replaceAll('"', '""')}"`)
+    .join("\n");
+}
+
+test("DART public financials: sheet sync, quarterly table, idempotent", async ({
+  page,
+}) => {
+  const body = await finCsv();
+  const tabs: string[] = [];
+  await page.route("https://docs.google.com/**", async (route) => {
+    tabs.push(new URL(route.request().url()).searchParams.get("sheet") || "");
+    await route.fulfill({
+      status: 200,
+      contentType: "text/csv",
+      headers: { "access-control-allow-origin": "*" },
+      body,
+    });
+  });
+  await openPanel(page);
+  const fin = page.getByRole("region", { name: "공시 실적 (DART)" });
+  await expect(fin).toContainText("아직 가져온 공시 실적이 없습니다.");
+  await fin
+    .getByLabel("공시 스프레드시트 링크 또는 ID", { exact: true })
+    .fill(`https://docs.google.com/spreadsheets/d/${FIN_SHEET}/edit`);
+  await fin
+    .getByRole("button", { name: "공시 시트 연결", exact: true })
+    .click();
+  await expect(fin).toContainText("동기화 완료");
+  await expect(fin).toContainText("새 공시 반영 · 21개 항목");
+  expect(tabs).toEqual(["pmzip_dart"]);
+  const table = fin.getByRole("table");
+  const q1 = table.getByRole("row", { name: /2026 Q1/ });
+  await expect(q1).toContainText("1,000,000억");
+  await expect(q1).toContainText("10%");
+  await expect(q1).toContainText("+11.1%");
+  await expect(table.getByRole("row", { name: /2025 Q4\*/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /2025 Q1/ })).toContainText("—");
+  await expect(fin).toContainText("인과관계로 해석하지 않습니다");
+  await noOverflow(page);
+
+  await openPanel(page);
+  await expect(
+    page.getByRole("region", { name: "공시 실적 (DART)" }),
+  ).toContainText("변경 없음 · 21개 항목");
+});

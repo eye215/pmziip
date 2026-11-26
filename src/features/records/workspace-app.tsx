@@ -6,6 +6,7 @@ import { MeasurementWorkspace } from "../measurement/workspace";
 import { readiness } from "../measurement/model";
 import { SourceSplitReview } from "../measurement/source-split";
 import { CoachDataPanel } from "../coach-data/panel";
+import { PublicFinancialsPanel } from "../public-financials/panel";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -848,6 +849,7 @@ export function WorkspaceApp() {
             {tab === "data" && (
               <CoachDataPanel projects={state.workspace.projects} />
             )}
+            {tab === "data" && <PublicFinancialsPanel />}
             <footer>
               합성 로컬 워크스페이스 · 실제 로그인·운영 DB·외부 수집 미연결 ·
               중요한 입력 전후로 백업해 주세요.
