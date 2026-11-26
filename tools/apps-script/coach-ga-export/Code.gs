@@ -24,9 +24,10 @@ var SUMMARY_TAB = 'pmzip_summary';
 var CHUNK_HEADER = 'pmzip.coach-ga-export.chunks';
 var CHUNK_SIZE = 30000; // Sheets cell limit is 50,000 characters.
 
-/** Web app (Execute as: Me, Access: Only myself). ?start=YYYY-MM-DD&end=YYYY-MM-DD optional. */
+/** Web app (Execute as: Me, Access: Only myself). ?start=YYYY-MM-DD&end=YYYY-MM-DD optional; ?inbox=1 → Inbox.gs. */
 function doGet(e) {
   var p = (e && e.parameter) || {};
+  if (p.inbox) return inboxDownload_(); // Inbox.gs: private requirement intake file
   var periods = p.start && p.end ? [{ startDate: p.start, endDate: p.end }] : defaultPeriods_();
   var json = JSON.stringify(buildExport_(periods), null, 2);
   return ContentService.createTextOutput(json)
