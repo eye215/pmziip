@@ -216,3 +216,130 @@ details > summary {
 .scope-note {
   color: var(--muted);
 }
+
+/* Flow bar: five stages on each initiative card */
+.flow-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+.panel ol.flow-bar,
+.flow-bar {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+}
+.flow-bar li {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.flow-bar .st-collect {
+  background: var(--st-collect);
+}
+.flow-bar .st-decide {
+  background: var(--st-decide);
+}
+.flow-bar .st-change {
+  background: var(--st-change);
+}
+.flow-bar .st-release {
+  background: var(--st-release);
+}
+.flow-bar .st-impact {
+  background: var(--st-impact);
+}
+.flow-bar.declined li.on {
+  background: var(--muted);
+}
+.flow-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--body);
+  white-space: nowrap;
+}
+.case-ring {
+  --p: 0;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background:
+    radial-gradient(closest-side, var(--surface) 76%, transparent 78% 100%),
+    conic-gradient(var(--accent) calc(var(--p) * 1%), var(--line) 0);
+}
+.record-row.work-declined {
+  background: #f6f7fa;
+  border-radius: 12px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.record-row.work-declined h3 {
+  color: var(--body);
+}
+
+/* Home: this month's flow (payoff card, brand gradient) */
+.home-flow {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  padding: 20px 22px;
+  margin-bottom: 24px;
+  color: #fff;
+  background: var(--brand);
+}
+.home-flow::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -70px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+.home-flow-k {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.home-flow-v {
+  margin: 2px 0 12px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.home-flow-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0;
+}
+.home-flow-stats dt {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.home-flow-stats dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}

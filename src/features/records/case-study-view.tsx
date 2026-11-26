@@ -2,7 +2,13 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import type { Initiative, RecordsState } from "./model";
-import { caseStudy, caseStudyText, dayIn, missingHint } from "./case-study";
+import {
+  caseStudy,
+  caseStudyText,
+  dayIn,
+  flowStages,
+  missingHint,
+} from "./case-study";
 import { readWindows } from "../coach-data/release-read";
 import {
   compareRows,
@@ -99,48 +105,88 @@ export function CaseStudyView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [releaseDay, isCoach, projectId, version],
   );
-  const lines = caseStudy(work, state, releaseSummary(windows));
+  const summary = releaseSummary(windows);
+  const lines = caseStudy(work, state, summary);
   const done = lines.filter((l) => !l.missing).length;
+  const flow = flowStages(work, state, !!summary);
+  const reached = flow.stages.filter((x) => x.done);
+  const current = flow.declined
+    ? "안 하기로 결정"
+    : (reached.at(-1)?.label ?? "시작 전");
   const [copied, setCopied] = useState("");
   const statusId = useId();
   return (
-    <details className="case-study">
-      <summary>
-        케이스 스터디 · {done}/{lines.length} 작성
-      </summary>
-      <ol className="case-lines">
-        {lines.map((l) => (
-          <li key={l.key} className={l.missing ? "case-missing" : undefined}>
-            <strong>{l.label}</strong>{" "}
-            <span>{l.missing ? `미작성 — ${missingHint(l.key)}` : l.text}</span>
-          </li>
-        ))}
-      </ol>
-      {releaseDay && project?.kind === "coach" && (
-        <section aria-label="배포 전후 비교">
-          <h4>배포 전·후 (Coach GA)</h4>
-          <ReleaseCompare windows={windows} />
-        </section>
-      )}
-      <div className="actions">
-        <button
-          type="button"
-          aria-describedby={statusId}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(caseStudyText(work, lines));
-              setCopied("복사했습니다.");
-            } catch {
-              setCopied("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.");
-            }
-          }}
+    <>
+      <div className="flow-row">
+        <ol
+          className={flow.declined ? "flow-bar declined" : "flow-bar"}
+          aria-label={`진행 단계: ${current}`}
         >
-          텍스트로 복사
-        </button>
-        <span id={statusId} role="status" className="subtle">
-          {copied}
+          {flow.stages.map((x) => (
+            <li
+              key={x.key}
+              className={x.done ? `on st-${x.key}` : undefined}
+              title={`${x.label}${x.done ? " 완료" : ""}`}
+            >
+              <span className="visually-hidden">
+                {x.label} {x.done ? "완료" : "전"}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <span className="flow-label">{current}</span>
+        <span
+          className="case-ring"
+          style={{
+            ["--p" as string]: String(Math.round((done / lines.length) * 100)),
+          }}
+          aria-hidden="true"
+        >
+          {done}/{lines.length}
         </span>
       </div>
-    </details>
+      <details className="case-study">
+        <summary>
+          케이스 스터디 · {done}/{lines.length} 작성
+        </summary>
+        <ol className="case-lines">
+          {lines.map((l) => (
+            <li key={l.key} className={l.missing ? "case-missing" : undefined}>
+              <strong>{l.label}</strong>{" "}
+              <span>
+                {l.missing ? `미작성 — ${missingHint(l.key)}` : l.text}
+              </span>
+            </li>
+          ))}
+        </ol>
+        {releaseDay && project?.kind === "coach" && (
+          <section aria-label="배포 전후 비교">
+            <h4>배포 전·후 (Coach GA)</h4>
+            <ReleaseCompare windows={windows} />
+          </section>
+        )}
+        <div className="actions">
+          <button
+            type="button"
+            aria-describedby={statusId}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(caseStudyText(work, lines));
+                setCopied("복사했습니다.");
+              } catch {
+                setCopied(
+                  "복사하지 못했습니다. 브라우저 권한을 확인해 주세요.",
+                );
+              }
+            }}
+          >
+            텍스트로 복사
+          </button>
+          <span id={statusId} role="status" className="subtle">
+            {copied}
+          </span>
+        </div>
+      </details>
+    </>
   );
 }

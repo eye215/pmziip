@@ -13,6 +13,7 @@ import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
 import { ReportPanel } from "../report/panel";
+import { HomeFlow } from "../report/home-flow";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -327,6 +328,7 @@ export function WorkspaceApp() {
             )}
             {tab === "projects" && (
               <>
+                <HomeFlow state={state} month={month} />
                 <section
                   className="overview"
                   aria-labelledby="projects-heading"
@@ -747,7 +749,11 @@ export function WorkspaceApp() {
                 )}
                 {works.map((work) => (
                   <article
-                    className="record-row"
+                    className={
+                      work.status === "canceled"
+                        ? "record-row work-declined"
+                        : "record-row"
+                    }
                     key={work.id}
                     aria-label={`${work.title} 과제`}
                   >

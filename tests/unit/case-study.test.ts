@@ -137,3 +137,50 @@ describe("case study (portfolio)", () => {
     expect(caseStudy(work, s)).toEqual(lines); // deterministic
   });
 });
+
+describe("flow stages", () => {
+  it("marks each stage from records only; declined is flagged", async () => {
+    const { flowStages } =
+      await import("../../src/features/records/case-study");
+    let s = createState(runtime.session);
+    const p = s.workspace.projects[0].id;
+    s = applyCommand(
+      s,
+      {
+        type: "initiative.save",
+        sourceIds: [],
+        data: {
+          projectId: p,
+          title: "합성 단계",
+          problem: "",
+          targetSegment: "",
+          expectedChange: "",
+          category: "fix",
+          priority: "medium",
+          assignee: "",
+          contribution: "",
+          decisionReason: "",
+          alternative: "",
+          plannedAt: null,
+          targetMonth: null,
+          status: "approved",
+          changeSummary: "버튼 이동",
+        },
+      },
+      runtime,
+    );
+    const w = s.initiatives.at(-1)!;
+    const f = flowStages(w, s, false);
+    expect(f.stages.map((x) => [x.key, x.done])).toEqual([
+      ["collect", false],
+      ["decide", true],
+      ["change", true],
+      ["release", false],
+      ["impact", false],
+    ]);
+    expect(f.declined).toBe(false);
+    expect(flowStages({ ...w, status: "canceled" }, s, false).declined).toBe(
+      true,
+    );
+  });
+});
