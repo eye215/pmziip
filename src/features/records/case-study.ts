@@ -176,3 +176,32 @@ export function caseStudyText(work: Initiative, lines: CaseLine[]) {
     ),
   ].join("\n");
 }
+
+/** The five flow stages, each done or not — from records only. */
+export type FlowStage = {
+  key: "collect" | "decide" | "change" | "release" | "impact";
+  label: string;
+  done: boolean;
+};
+export function flowStages(
+  work: Initiative,
+  state: RecordsState,
+  hasImpact: boolean,
+): { stages: FlowStage[]; declined: boolean } {
+  const linked = state.links.some((l) => l.initiativeId === work.id);
+  const decided = work.status !== "draft";
+  const released = !!work.releasedAt || work.status === "released";
+  const changed =
+    !!(work.changeSummary || work.specUrl || work.frictions.length) ||
+    ["planned", "in_progress", "released"].includes(work.status);
+  return {
+    declined: work.status === "canceled",
+    stages: [
+      { key: "collect", label: "수집", done: linked },
+      { key: "decide", label: "결정", done: decided },
+      { key: "change", label: "변경", done: changed },
+      { key: "release", label: "배포", done: released },
+      { key: "impact", label: "성과", done: released && hasImpact },
+    ],
+  };
+}
