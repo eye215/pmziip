@@ -104,22 +104,44 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   ).toBeVisible();
   await noOverflow(page);
 
-  const oct = panel.getByRole("article", {
-    name: "2026-10-01~2026-10-31 GA 기간",
-  });
-  await expect(oct).toContainText("300 / 620");
-  await expect(oct).toContainText("유효 점수(1~5) 건수600");
-  await expect(oct).toContainText("점수 없는 REPORT20");
-  await expect(oct).toContainText("GA 임계값");
-  await expect(oct).toContainText("75%");
-  const nov = panel.getByRole("article", {
-    name: "2026-11-01~2026-11-24 GA 기간",
-  });
-  await expect(nov).toContainText("N/A (분모 0)");
-  await expect(nov).toContainText("미집계");
-  await oct.getByText("국가·Sales Case별 이용 현황").click();
-  await expect(oct.getByRole("table", { name: "국가별" })).toContainText("XA");
-  await expect(oct).toContainText("합산하지 않습니다");
+  await expect(panel).toContainText("저장된 기간 2개");
+
+  // Viewing happens in the 성과 tab.
+  await panel.getByRole("button", { name: "성과 탭에서 보기" }).click();
+  const coach = page.getByRole("region", { name: "Galaxy Coach 이용" });
+  await expect(coach.getByLabel("기간")).toHaveValue(/.+/);
+  await expect(coach.getByLabel("기간").locator("option:checked")).toHaveText(
+    "2026년 10월",
+  );
+  await expect(coach.locator(".stat-row")).toContainText("진입 UU1,000");
+  await expect(coach.locator(".stat-row")).toContainText("훈련 완료율 (UU)75%");
+  await expect(coach.locator(".stat-row")).toContainText(
+    "훈련 완료율 (횟수)68.9%",
+  );
+  await expect(coach).toContainText("GA 임계값");
+  await expect(coach).toContainText("한 달 전체 기간이 2개 이상 쌓이면");
+  await coach.getByText("2026년 10월 전체 지표").click();
+  await expect(coach).toContainText("300 / 620");
+  await expect(coach).toContainText("유효 점수(1~5) 건수600");
+  await expect(coach).toContainText("점수 없는 REPORT20");
+  await coach.getByText("국가·Sales Case별 이용 현황").click();
+  await expect(coach.getByRole("table", { name: "국가별" })).toContainText(
+    "XA",
+  );
+  await expect(coach).toContainText("합산하지 않습니다");
+  await coach
+    .getByLabel("기간")
+    .selectOption({ label: "2026-11-01 ~ 2026-11-24" });
+  await expect(coach.locator(".stat-row")).toContainText(
+    "훈련 완료율 (UU)미집계",
+  );
+  await coach.getByText(/전체 지표$/).click();
+  await expect(coach).toContainText("N/A (분모 0)");
+  await noOverflow(page);
+  await page
+    .getByRole("navigation", { name: "워크스페이스 메뉴" })
+    .getByRole("button", { name: "백업·가져오기", exact: true })
+    .click();
 
   // Records state is untouched; GA data lives under its own key.
   expect(await page.evaluate((k) => localStorage.getItem(k), RECORDS_KEY)).toBe(
@@ -136,7 +158,7 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   await page.reload();
   const again = await openPanel(page);
   await again.getByText("파일로 직접 가져오기", { exact: true }).click();
-  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  await expect(again).toContainText("저장된 기간 2개");
   await again
     .getByLabel("내보내기 JSON 붙여넣기", { exact: true })
     .fill(await fixture());
@@ -222,7 +244,7 @@ test("linked sheet: connect, auto-sync once per visit, idempotent, failure keeps
   await panel.getByRole("button", { name: "시트 연결", exact: true }).click();
   await expect(panel.getByRole("status").first()).toContainText("동기화 완료");
   await expect(panel).toContainText("새 기간 2개 · 재수집 0개 · 변경 없음 0개");
-  await expect(panel.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  await expect(panel).toContainText("저장된 기간 2개");
   expect(requests[0]).toBe(
     `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&sheet=pmzip_export`,
   );
@@ -232,13 +254,13 @@ test("linked sheet: connect, auto-sync once per visit, idempotent, failure keeps
   const again = await openPanel(page);
   await expect(again).toContainText("새 기간 0개 · 재수집 0개 · 변경 없음 2개");
   expect(requests).toHaveLength(2);
-  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  await expect(again).toContainText("저장된 기간 2개");
 
   // A failing fetch writes nothing and keeps saved periods.
   status = 404;
   await again.getByRole("button", { name: "지금 동기화", exact: true }).click();
   await expect(again.getByRole("alert")).toContainText("HTTP 404");
-  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  await expect(again).toContainText("저장된 기간 2개");
 
   // Disconnect removes only the setting, not imported data.
   page.once("dialog", (d) => d.accept());
@@ -248,7 +270,7 @@ test("linked sheet: connect, auto-sync once per visit, idempotent, failure keeps
   await expect(
     again.getByLabel("GA 스프레드시트 링크 또는 ID", { exact: true }),
   ).toBeVisible();
-  await expect(again.getByRole("article", { name: /GA 기간$/ })).toHaveCount(2);
+  await expect(again).toContainText("저장된 기간 2개");
 });
 
 const FIN_SHEET = "SyntheticFinSheet_0123456789abcdefghij";
@@ -296,35 +318,33 @@ test("DART public financials: sheet sync, quarterly table, idempotent", async ({
   await expect(fin).toContainText("동기화 완료");
   await expect(fin).toContainText("새 공시 반영 · 35개 항목");
   expect(tabs).toEqual(["pmzip_dart"]);
-  // Default: plain-language view of the first company.
-  const easy = fin.getByRole("region", { name: /합성전자 쉽게 보기/ });
+  await expect(fin).toContainText("회사 2곳 · 35개 항목");
+  await fin.getByRole("button", { name: "성과 탭에서 보기" }).click();
+  const view = page.getByRole("region", { name: "공시 실적" });
+  const companies = view.getByRole("group", { name: "회사" });
+  await expect(
+    companies.getByRole("button", { name: "합성전자" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const easy = view.getByRole("region", { name: /쉽게 보기/ });
   await expect(easy).toContainText("2026년 3분기");
   await expect(easy).toContainText("한마디로: 1년 전보다 좋아지고 있어요.");
-  await expect(easy).toContainText("AI 미사용");
-  await fin
-    .getByLabel("회사", { exact: true })
-    .selectOption({ label: "합성에듀" });
-  const edu = fin.getByRole("region", { name: /합성에듀 쉽게 보기/ });
-  await expect(edu).toContainText("돈이 남는 회사로 바뀌었어요");
-  await expect(fin.getByLabel("재무제표 기준", { exact: true })).toHaveValue(
-    "OFS",
-  );
-  await noOverflow(page);
-  await fin
-    .getByLabel("회사", { exact: true })
-    .selectOption({ label: "합성전자" });
-  await fin.getByRole("button", { name: "표로 보기", exact: true }).click();
   await expect(
-    fin.getByRole("button", { name: "표로 보기", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  const table = fin.getByRole("table");
+    view.getByRole("img", { name: "합성전자 분기 매출" }),
+  ).toBeVisible();
+  await companies.getByRole("button", { name: "합성에듀" }).click();
+  await expect(easy).toContainText("돈이 남는 회사로 바뀌었어요");
+  await expect(view.getByLabel("재무제표 기준")).toHaveValue("OFS");
+  await noOverflow(page);
+  await companies.getByRole("button", { name: "합성전자" }).click();
+  await view.getByText("분기 표 보기").click();
+  const table = view.getByRole("table");
   const q1 = table.getByRole("row", { name: /2026 Q1/ });
-  await expect(q1).toContainText("1,000,000억");
+  await expect(q1).toContainText("100조");
   await expect(q1).toContainText("10%");
   await expect(q1).toContainText("+11.1%");
   await expect(table.getByRole("row", { name: /2025 Q4\*/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /2025 Q1/ })).toContainText("—");
-  await expect(fin).toContainText("인과관계로 해석하지 않습니다");
+  await expect(view).toContainText("인과관계로 해석하지 않습니다");
   await noOverflow(page);
 
   await openPanel(page);
@@ -354,7 +374,6 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
   const market = page.getByRole("region", {
     name: "국가별 제조사 점유율 (StatCounter)",
   });
-  await expect(market).toContainText("판매량·출하량이 아니라");
   await expect(
     market.getByRole("link", { name: /StatCounter Global Stats/ }),
   ).toBeVisible();
@@ -384,19 +403,28 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
     "새 값 0개 · 변경 없음 2개",
   );
 
-  await market.getByLabel("제조사", { exact: true }).selectOption("VendorA");
-  const table = market.getByRole("table");
-  await expect(table).toContainText("2026-10 Coach 진입 UU");
-  const xa = table.getByRole("row", { name: /XA/ });
-  await expect(xa).toContainText("35.0%");
-  await expect(xa).toContainText("+5.0%p");
-  await expect(xa).toContainText("600");
-  await expect(table.getByRole("row", { name: /XB/ })).toContainText("—");
+  await expect(market).toContainText("2개국 · 8개 값");
   await expect(
     market.getByLabel("또는 CSV 붙여넣기", { exact: true }),
   ).toHaveValue("");
 
   await upload("Korea", '"Date","VendorA"\n2026-10,1');
   await expect(market.getByRole("alert")).toContainText("영문 대문자 2자리");
+  await noOverflow(page);
+
+  // Viewing in the 성과 tab: share, year-ago change, same-month Coach UU.
+  await market.getByRole("button", { name: "성과 탭에서 보기" }).click();
+  const view = page.getByRole("region", { name: "국가별 제조사 점유율" });
+  await expect(view).toContainText("판매량이 아닌 웹 이용 기반 점유율");
+  await view.getByLabel("제조사", { exact: true }).selectOption("VendorA");
+  const table = view.getByRole("table");
+  await expect(table).toContainText("Coach UU 2026-10");
+  const xa = table.getByRole("row", { name: /XA/ });
+  await expect(xa).toContainText("35.0%");
+  await expect(xa).toContainText("▲ 5.0%p");
+  await expect(xa).toContainText("600");
+  await expect(table.getByRole("row", { name: /XB/ })).toContainText("—");
+  await view.getByLabel("정렬").selectOption("coach");
+  await expect(table.getByRole("row").nth(1)).toContainText("XA");
   await noOverflow(page);
 });

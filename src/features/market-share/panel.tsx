@@ -6,8 +6,6 @@ import {
   MARKET_TAB,
   marketFileSchema,
   parseStatCounterCsv,
-  shareTable,
-  vendors,
   type SharePoint,
 } from "../../lib/connectors/market-share";
 import {
@@ -16,7 +14,7 @@ import {
   sheetCsvUrl,
   sheetIdFrom,
 } from "../../lib/connectors/sheet-source";
-import { session } from "../records/browser-store";
+import { changeView, session } from "../records/browser-store";
 import {
   latestSnapshots,
   loadCoach,
@@ -86,7 +84,7 @@ const regionNames = (() => {
   }
 })();
 /** "KR" → "대한민국 (KR)"; unknown codes stay as-is. */
-function countryLabel(code: string) {
+export function countryLabel(code: string) {
   try {
     const name = regionNames?.of(code);
     return name && name !== code ? `${name} (${code})` : code;
@@ -94,12 +92,9 @@ function countryLabel(code: string) {
     return code;
   }
 }
-const share = (v: number | null) => (v === null ? "—" : `${v.toFixed(1)}%`);
-const pp = (v: number | null) =>
-  v === null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
 
 /** Coach per-country entry UU for the latest full month, if imported. */
-function coachMonth(projects: ProjectOption[]) {
+export function coachMonth(projects: ProjectOption[]) {
   try {
     const projectId =
       loadCoachSource(window.localStorage, session)?.projectId ??
@@ -124,7 +119,7 @@ function coachMonth(projects: ProjectOption[]) {
   }
 }
 
-export function MarketSharePanel({ projects }: { projects: ProjectOption[] }) {
+export function MarketSharePanel() {
   const ids = useId();
   const [store, setStore] = useState(() => readMarket());
   const [source, setSource] = useState<MarketSource | null>(() => readSource());
@@ -135,7 +130,6 @@ export function MarketSharePanel({ projects }: { projects: ProjectOption[] }) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
     null,
   );
-  const [vendor, setVendor] = useState("");
 
   async function save(points: SharePoint[], from: "sheet" | "csv") {
     if (!navigator.locks)
@@ -225,17 +219,6 @@ export function MarketSharePanel({ projects }: { projects: ProjectOption[] }) {
   }, []);
 
   const points = store.loaded ? latestPoints(store.loaded.state) : [];
-  const vendorList = vendors(points);
-  const selected = vendorList.includes(vendor) ? vendor : (vendorList[0] ?? "");
-  const table = selected ? shareTable(points, selected) : [];
-  const coach = coachMonth(projects);
-  const coachShare = (c: string) =>
-    coach
-      ? (points.find(
-          (p) =>
-            p.country === c && p.month === coach.month && p.vendor === selected,
-        )?.share ?? null)
-      : null;
   const coachSheet = (() => {
     try {
       return loadCoachSource(window.localStorage, session)?.sheetId || "";
@@ -247,10 +230,7 @@ export function MarketSharePanel({ projects }: { projects: ProjectOption[] }) {
   return (
     <section className="panel coach-data" aria-labelledby={`${ids}-h`}>
       <h2 id={`${ids}-h`}>국가별 제조사 점유율 (StatCounter)</h2>
-      <p className="notice">
-        판매량·출하량이 아니라 웹 이용 기반의 모바일 제조사 점유율입니다. Coach
-        이용과 나란히 보더라도 인과관계로 해석하지 않습니다.
-      </p>
+
       <p className="subtle">
         출처:{" "}
         <a
@@ -424,71 +404,18 @@ export function MarketSharePanel({ projects }: { projects: ProjectOption[] }) {
           {message.text}
         </p>
       )}
-      {!points.length ? (
-        <p className="empty-state">아직 가져온 점유율이 없습니다.</p>
-      ) : (
-        <>
-          <div className="field">
-            <label htmlFor={`${ids}-vendor`}>제조사</label>
-            <select
-              id={`${ids}-vendor`}
-              value={selected}
-              onChange={(e) => setVendor(e.target.value)}
-            >
-              {vendorList.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="coach-table-wrap">
-            <table className="coach-table">
-              <caption>{selected} 국가별 모바일 이용 점유율</caption>
-              <thead>
-                <tr>
-                  <th scope="col">국가</th>
-                  <th scope="col">최근 월</th>
-                  <th scope="col">점유율</th>
-                  <th scope="col">1년 전</th>
-                  <th scope="col">변화</th>
-                  {coach && <th scope="col">{coach.month} 점유율</th>}
-                  {coach && <th scope="col">{coach.month} Coach 진입 UU</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {table.map((r) => (
-                  <tr key={r.country}>
-                    <th scope="row">{countryLabel(r.country)}</th>
-                    <td>{r.month}</td>
-                    <td>{share(r.share)}</td>
-                    <td>{share(r.yearAgo)}</td>
-                    <td>{pp(r.changePp)}</td>
-                    {coach && <td>{share(coachShare(r.country))}</td>}
-                    {coach && (
-                      <td>
-                        {(() => {
-                          const u = coach.users.get(r.country);
-                          return u === undefined || u === null
-                            ? "—"
-                            : u.toLocaleString("ko-KR");
-                        })()}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="subtle">
-            변화는 같은 달 1년 전 대비 %p 차이입니다. 값이 없으면 —로 두고 0으로
-            바꾸지 않습니다.
-            {coach
-              ? " Coach 진입 UU는 가져온 GA 기간의 국가별 값이며, 국가별 UU는 더하지 않습니다."
-              : " GA 한 달 전체 기간을 가져오면 같은 달 Coach 국가별 진입 UU를 함께 보여 줍니다."}
-          </p>
-        </>
-      )}
+      <div className="connector-summary">
+        <span>
+          {points.length
+            ? `${new Set(points.map((p) => p.country)).size}개국 · ${points.length}개 값`
+            : "아직 가져온 점유율이 없습니다."}
+        </span>
+        {points.length > 0 && (
+          <button type="button" onClick={() => changeView({ tab: "perf" })}>
+            성과 탭에서 보기
+          </button>
+        )}
+      </div>
     </section>
   );
 }

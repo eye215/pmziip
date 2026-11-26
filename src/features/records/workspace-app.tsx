@@ -8,6 +8,7 @@ import { SourceSplitReview } from "../measurement/source-split";
 import { CoachDataPanel } from "../coach-data/panel";
 import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
+import { PerformanceView } from "../performance/view";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -214,44 +215,47 @@ export function WorkspaceApp() {
               이 브라우저에만 저장하는 합성 모드입니다. 실제 로그인·서버 저장은
               지원하지 않습니다.
             </p>
-            <section className="filters" aria-label="조회 조건">
-              <div>
-                <label htmlFor="scope">조회 범위</label>
-                <select
-                  id="scope"
-                  value={scope}
-                  onChange={(e) => navigate({ scope: e.target.value })}
-                >
-                  <option value="all">전체 프로젝트</option>
-                  {state.workspace.clients.map((c) => (
-                    <option key={c.id} value={`client:${c.id}`}>
-                      {c.name}
-                      {c.archivedAt ? " (보관)" : ""}
-                    </option>
-                  ))}
-                  {state.workspace.projects.map((p) => (
-                    <option key={p.id} value={`project:${p.id}`}>
-                      {p.name}
-                      {p.archivedAt ? " (보관)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="month">조회 월</label>
-                <input
-                  id="month"
-                  type="month"
-                  min="2000-01"
-                  max="2100-12"
-                  value={month}
-                  onChange={(e) => navigate({ month: e.target.value })}
-                />
-              </div>
-            </section>
+            {tab !== "perf" && (
+              <section className="filters" aria-label="조회 조건">
+                <div>
+                  <label htmlFor="scope">조회 범위</label>
+                  <select
+                    id="scope"
+                    value={scope}
+                    onChange={(e) => navigate({ scope: e.target.value })}
+                  >
+                    <option value="all">전체 프로젝트</option>
+                    {state.workspace.clients.map((c) => (
+                      <option key={c.id} value={`client:${c.id}`}>
+                        {c.name}
+                        {c.archivedAt ? " (보관)" : ""}
+                      </option>
+                    ))}
+                    {state.workspace.projects.map((p) => (
+                      <option key={p.id} value={`project:${p.id}`}>
+                        {p.name}
+                        {p.archivedAt ? " (보관)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="month">조회 월</label>
+                  <input
+                    id="month"
+                    type="month"
+                    min="2000-01"
+                    max="2100-12"
+                    value={month}
+                    onChange={(e) => navigate({ month: e.target.value })}
+                  />
+                </div>
+              </section>
+            )}
             <nav className="workspace-nav" aria-label="워크스페이스 메뉴">
               {[
                 ["projects", "프로젝트"],
+                ["perf", "성과"],
                 ["inbox", "통합 수집함"],
                 ["work", "개선 과제"],
                 ["data", "백업·가져오기"],
@@ -265,33 +269,42 @@ export function WorkspaceApp() {
                   }
                   onClick={() => navigate({ tab: id })}
                 >
-                  {label}
+                  {label.includes("·") ? (
+                    <>
+                      {label.split("·")[0]}·<wbr />
+                      {label.split("·")[1]}
+                    </>
+                  ) : (
+                    label
+                  )}
                 </button>
               ))}
             </nav>
-            <div className="toolbar">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={archived}
-                  onChange={(e) =>
-                    navigate({ archived: e.target.checked ? "1" : "" })
-                  }
-                />
-                보관 기록 포함
-              </label>
-              {(tab === "inbox" || tab === "work") && (
-                <label className="search-label" htmlFor="record-search">
-                  검색
+            {tab !== "perf" && (
+              <div className="toolbar">
+                <label className="check">
                   <input
-                    id="record-search"
-                    type="search"
-                    value={q}
-                    onChange={(e) => navigate({ q: e.target.value })}
+                    type="checkbox"
+                    checked={archived}
+                    onChange={(e) =>
+                      navigate({ archived: e.target.checked ? "1" : "" })
+                    }
                   />
+                  보관 기록 포함
                 </label>
-              )}
-            </div>
+                {(tab === "inbox" || tab === "work") && (
+                  <label className="search-label" htmlFor="record-search">
+                    검색
+                    <input
+                      id="record-search"
+                      type="search"
+                      value={q}
+                      onChange={(e) => navigate({ q: e.target.value })}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
             {notice && (
               <p className="notice" role="status">
                 {notice}
@@ -851,9 +864,10 @@ export function WorkspaceApp() {
               <CoachDataPanel projects={state.workspace.projects} />
             )}
             {tab === "data" && <PublicFinancialsPanel />}
-            {tab === "data" && (
-              <MarketSharePanel projects={state.workspace.projects} />
+            {tab === "perf" && (
+              <PerformanceView projects={state.workspace.projects} />
             )}
+            {tab === "data" && <MarketSharePanel />}
             <footer>
               합성 로컬 워크스페이스 · 실제 로그인·운영 DB·외부 수집 미연결 ·
               중요한 입력 전후로 백업해 주세요.
