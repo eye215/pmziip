@@ -8,10 +8,14 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.4.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.5.0' };
 /** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
 var INBOX_LAST_STATUS_ = '';
-var INBOX_MAX_ITEMS = 300;
+// Separate caps so one source cannot crowd out another (PM.zip accepts ≤1000).
+var INBOX_MAX_ITEMS = 300; // Gmail messages
+var INBOX_MAX_CALENDAR = 100;
+var INBOX_MAX_SLACK = 300;
+var INBOX_SHEET_MAX_BODY = 8000; // per item in the shared sheet (keeps the tab small)
 var INBOX_MAX_BODY = 20000;
 
 function inboxDomain_(from) {
@@ -227,11 +231,13 @@ function buildInboxExport_() {
     var cal = CalendarApp.getDefaultCalendar();
     var end = new Date();
     var start = new Date(end.getTime() - calDays * 864e5);
+    var nCalendar = 0;
     cal.getEvents(start, end).forEach(function (e) {
-      if (items.length >= INBOX_MAX_ITEMS) return;
+      if (nCalendar >= INBOX_MAX_CALENDAR) return;
       var desc = String(e.getDescription() || '').replace(/<[^>]+>/g, ' ');
       if (!desc.trim()) return; // only meetings with notes/agenda
       var eid = Utilities.base64EncodeWebSafe(e.getId().split('@')[0] + ' ' + cal.getId()).replace(/=+$/, '');
+      nCalendar++;
       items.push({
         channel: 'calendar',
         externalId: 'calendar:' + e.getId() + ':' + e.getStartTime().toISOString(),
@@ -249,11 +255,11 @@ function buildInboxExport_() {
   var slackPart = 'Slack 미설정';
   if (typeof slackItems_ === 'function') {
     try {
-      var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
+      var slack = slackItems_(INBOX_MAX_SLACK);
       items = items.concat(slack.items);
       notes = slack.notes;
       var on = props.getProperty('SLACK_BOT_TOKEN') && (pmzipCheckedIn_(PMZIP_LISTS.slack) || pmzipSetting_('SLACK_CHANNELS'));
-      slackPart = on ? 'Slack ' + slack.items.length + '건' : 'Slack 미설정(토큰·채널)';
+      slackPart = on ? 'Slack ' + slack.items.length + '건' + (slack.items.length >= INBOX_MAX_SLACK ? '(상한 도달)' : '') : 'Slack 미설정(토큰·채널)';
     } catch (e) {
       // Mail and calendar still go out when Slack fails.
       slackPart = 'Slack 실패';
@@ -261,7 +267,7 @@ function buildInboxExport_() {
     }
   }
   INBOX_LAST_STATUS_ = [
-    'Gmail ' + nGmail + '건 (' + (query ? '검색식' : '라벨 ' + label) + ', 최근 ' + days + '일)',
+    'Gmail ' + nGmail + '건' + (nGmail >= INBOX_MAX_ITEMS ? '(상한 도달)' : '') + ' (' + (query ? '검색식' : '라벨 ' + label) + ', 최근 ' + days + '일)',
     calDays > 0 ? '캘린더 ' + nCal + '건' : '캘린더 끔',
     slackPart,
   ].join(' · ') + (notes.length ? ' — ' + notes.join(' / ') : '');
@@ -327,7 +333,7 @@ function exportInboxToSheet() {
   var data = buildInboxExport_();
   data.items.forEach(function (it) {
     it.title = inboxClean_(it.title).slice(0, 300);
-    it.body = inboxClean_(it.body).slice(0, INBOX_MAX_BODY);
+    it.body = inboxClean_(it.body).slice(0, INBOX_SHEET_MAX_BODY);
   });
   data.generator = { name: INBOX_GENERATOR.name, version: INBOX_GENERATOR.version + '+sheet' };
   var ss = SpreadsheetApp.getActiveSpreadsheet();
