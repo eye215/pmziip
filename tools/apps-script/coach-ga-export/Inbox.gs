@@ -133,5 +133,6 @@ function installInboxTrigger() {
     if (t.getHandlerFunction() === 'exportInboxToSheet') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('exportInboxToSheet').timeBased().everyDays(1).atHour(7).create();
-  Logger.log('매일 07시대 메일 수집 트리거를 설치했습니다 (실행 계정: ' + Session.getEffectiveUser().getEmail().replace(/^[^@]+/, '…') + ').');
+  // No account e-mail in the log: that would need the userinfo.email scope.
+  Logger.log('매일 07시대 메일 수집 트리거를 설치했습니다.');
 }

@@ -208,3 +208,46 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
     expect(file.items[0].fromDomain).toBe("@example.invalid");
   });
 });
+
+describe("installInboxTrigger", () => {
+  it("replaces its own trigger and needs no extra scopes (no Session user e-mail)", () => {
+    const created: string[] = [];
+    const deleted: string[] = [];
+    const builder = (fn: string) => ({
+      timeBased: () => ({
+        everyDays: () => ({
+          atHour: () => ({ create: () => void created.push(fn) }),
+        }),
+      }),
+    });
+    const ctx: Record<string, unknown> = {
+      ScriptApp: {
+        getProjectTriggers: () => [
+          { getHandlerFunction: () => "exportInboxToSheet" },
+          { getHandlerFunction: () => "dailyExport" },
+        ],
+        deleteTrigger: (t: { getHandlerFunction: () => string }) =>
+          void deleted.push(t.getHandlerFunction()),
+        newTrigger: builder,
+      },
+      Logger: { log: () => {} },
+      // Session.getEffectiveUser would require userinfo.email: must not be used.
+      Session: new Proxy(
+        {},
+        {
+          get: () => {
+            throw new Error("Session used");
+          },
+        },
+      ),
+    };
+    vm.createContext(ctx);
+    vm.runInContext(
+      readFileSync("tools/apps-script/coach-ga-export/Inbox.gs", "utf8"),
+      ctx,
+    );
+    vm.runInContext("installInboxTrigger()", ctx);
+    expect(deleted).toEqual(["exportInboxToSheet"]);
+    expect(created).toEqual(["exportInboxToSheet"]);
+  });
+});
