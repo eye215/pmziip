@@ -7,7 +7,7 @@
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('PM.zip')
-    .addItem('Gmail 라벨 불러와서 체크로 고르기', 'pmzipPickLabels')
+    .addItem('가져올 Gmail 라벨 고르기 (여러 개 선택)', 'pmzipPickLabels')
     .addItem('설정 탭 열기 (기간·채널 입력)', 'pmzipOpenSettings')
     .addItem('가져올 Gmail 라벨 직접 입력', 'pmzipSetInboxLabels')
     .addItem('Gmail 검색식으로 설정 (고급)', 'pmzipSetInboxQuery')
@@ -26,10 +26,10 @@ function pmzipProps_() {
   return PropertiesService.getScriptProperties();
 }
 
-/** Labels of the signed-in Gmail, for the prompt (first 30). */
-function pmzipLabelNames_() {
+/** Labels of the signed-in Gmail, sorted (first `max`, default 30). */
+function pmzipLabelNames_(max) {
   try {
-    return GmailApp.getUserLabels().map(function (l) { return l.getName(); }).slice(0, 30);
+    return GmailApp.getUserLabels().map(function (l) { return l.getName(); }).sort().slice(0, max || 30);
   } catch (e) {
     return [];
   }
@@ -146,20 +146,85 @@ function pmzipInstallInboxTrigger() {
   ui.alert('매일 07시대에 지금 이 계정의 메일을 가져오도록 설정했습니다. 메일을 읽을 계정으로 로그인한 상태에서 눌러야 합니다.');
 }
 
-/** Loads this account's Gmail labels into pmzip_settings as checkboxes. */
+/**
+ * Multi-select label picker: a dialog listing this account's Gmail labels
+ * with checkboxes (sheet dropdowns allow only one value). Saving writes the
+ * chosen labels to pmzip_settings and syncs the checkbox list there.
+ */
 function pmzipPickLabels() {
   var ui = SpreadsheetApp.getUi();
-  var n = pmzipRefreshLabelList_();
-  if (n < 0) {
-    ui.alert('Gmail 라벨을 읽지 못했습니다. 메일 계정으로 로그인했는지, 권한을 승인했는지 확인해 주세요.');
+  var names = pmzipLabelNames_(PMZIP_LABEL_MAX);
+  if (!names.length) {
+    ui.alert('Gmail 라벨을 읽지 못했거나 사용자 라벨이 없습니다. 메일 계정으로 로그인했는지, Gmail에 라벨이 있는지 확인해 주세요.');
     return;
   }
-  var sh = pmzipEnsureSettingsSheet_();
-  sh.activate();
-  var at = pmzipLabelSectionAt_(sh.getDataRange().getValues());
-  if (at >= 0) sh.getRange(at + 2, 2).activate();
-  ui.alert(n ? '라벨 ' + n + '개를 불러왔습니다. pmzip_settings 탭 "Gmail 라벨 목록"에서 가져올 라벨을 체크한 뒤 ' +
-    '"요구사항 메일 지금 가져오기"를 누르세요.' : '이 계정에 사용자 라벨이 없습니다. Gmail에서 라벨을 먼저 만들어 주세요.');
+  var current = pmzipCheckedLabels_() ||
+    String(pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP').split(',').map(function (x) { return x.trim(); });
+  var html = HtmlService.createHtmlOutput(pmzipLabelPickerHtml_(names, current, pmzipProps_().getProperty('INBOX_SHEET') === 'on'))
+    .setWidth(440).setHeight(560);
+  ui.showModalDialog(html, '가져올 Gmail 라벨 (여러 개 선택)');
+}
+
+/** Called from the dialog (google.script.run). Returns a message to show. */
+function pmzipSaveLabelPick(labels, runNow) {
+  var known = pmzipLabelNames_(PMZIP_LABEL_MAX);
+  var picked = (Array.isArray(labels) ? labels : []).map(function (x) { return String(x).trim(); })
+    .filter(function (x, k, a) { return x && known.indexOf(x) >= 0 && a.indexOf(x) === k; }).slice(0, 50);
+  if (!picked.length) throw new Error('라벨을 하나 이상 선택해 주세요.');
+  pmzipSaveSetting_('INBOX_GMAIL_LABEL', picked.join(', '));
+  pmzipSaveSetting_('INBOX_GMAIL_QUERY', ''); // labels take over from an old search
+  pmzipRefreshLabelList_(picked);
+  var msg = '저장했습니다: ' + picked.join(', ');
+  if (runNow && pmzipProps_().getProperty('INBOX_SHEET') === 'on') msg += '\n\n' + exportInboxToSheet();
+  return msg;
+}
+
+function pmzipLabelPickerHtml_(names, current, canRun) {
+  // JSON embedded with "<" escaped so label names cannot close the script tag.
+  var data = JSON.stringify({ names: names, current: current, canRun: !!canRun }).replace(/</g, '\\u003c');
+  return [
+    '<!doctype html><html><head><base target="_top"><meta charset="utf-8"><style>',
+    'body{font:14px/1.5 system-ui,sans-serif;margin:0;padding:12px;color:#1f2937}',
+    'input[type=search]{width:100%;box-sizing:border-box;padding:8px;font:inherit;margin-bottom:8px}',
+    '#list{max-height:360px;overflow:auto;border:1px solid #d1d5db;border-radius:6px;padding:4px 8px}',
+    'label.row{display:flex;gap:8px;align-items:center;min-height:36px;cursor:pointer}',
+    '.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}',
+    'button{min-height:40px;padding:0 14px;font:inherit;border-radius:6px;border:1px solid #9ca3af;background:#fff;cursor:pointer}',
+    'button.primary{background:#2563eb;color:#fff;border-color:#2563eb}',
+    'button:focus-visible,input:focus-visible{outline:2px solid #2563eb;outline-offset:2px}',
+    '#msg{white-space:pre-wrap;margin-top:10px}</style></head><body>',
+    '<label for="q">라벨 검색</label><input id="q" type="search" autocomplete="off">',
+    '<div id="count" aria-live="polite"></div>',
+    '<div id="list" role="group" aria-label="Gmail 라벨"></div>',
+    '<div class="bar"><button type="button" id="all">보이는 것 모두 선택</button>',
+    '<button type="button" id="none">모두 해제</button></div>',
+    '<div class="bar"><button type="button" class="primary" id="save">저장</button>',
+    '<button type="button" id="saveRun">저장하고 지금 가져오기</button>',
+    '<button type="button" id="close">닫기</button></div>',
+    '<div id="msg" role="status"></div>',
+    '<script>var D=' + data + ';',
+    'var chosen={};D.current.forEach(function(n){chosen[n]=true;});',
+    'var list=document.getElementById("list"),q=document.getElementById("q"),msg=document.getElementById("msg");',
+    'function draw(){var f=q.value.trim().toLowerCase();list.textContent="";',
+    'D.names.forEach(function(n,i){if(f&&n.toLowerCase().indexOf(f)<0)return;',
+    'var l=document.createElement("label");l.className="row";var c=document.createElement("input");',
+    'c.type="checkbox";c.checked=!!chosen[n];c.onchange=function(){chosen[n]=c.checked;count();};',
+    'l.appendChild(c);l.appendChild(document.createTextNode(n));list.appendChild(l);});count();}',
+    'function picked(){return D.names.filter(function(n){return chosen[n];});}',
+    'function count(){document.getElementById("count").textContent="선택 "+picked().length+"개 / 전체 "+D.names.length+"개";}',
+    'q.oninput=draw;',
+    'document.getElementById("all").onclick=function(){var f=q.value.trim().toLowerCase();',
+    'D.names.forEach(function(n){if(!f||n.toLowerCase().indexOf(f)>=0)chosen[n]=true;});draw();};',
+    'document.getElementById("none").onclick=function(){chosen={};draw();};',
+    'document.getElementById("close").onclick=function(){google.script.host.close();};',
+    'var run=document.getElementById("saveRun");if(!D.canRun)run.hidden=true;',
+    'function save(now){var p=picked();if(!p.length){msg.textContent="라벨을 하나 이상 선택해 주세요.";return;}',
+    'msg.textContent=now?"저장하고 가져오는 중…":"저장 중…";',
+    'google.script.run.withSuccessHandler(function(m){msg.textContent=m;})',
+    '.withFailureHandler(function(e){msg.textContent="오류: "+(e&&e.message||e);}).pmzipSaveLabelPick(p,now);}',
+    'document.getElementById("save").onclick=function(){save(false);};run.onclick=function(){save(true);};',
+    'draw();q.focus();</script></body></html>',
+  ].join('\n');
 }
 
 /** Shows (creating if needed) the pmzip_settings tab where values are typed directly. */

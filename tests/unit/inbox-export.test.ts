@@ -354,7 +354,34 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
     );
     (m.ctx.GmailApp as { getUserLabels: unknown }).getUserLabels = () =>
       labels.map((n) => ({ getName: () => n }));
+    const dialogs: string[] = [];
+    m.ctx.HtmlService = {
+      createHtmlOutput: (h: string) => {
+        dialogs.push(h);
+        const o = { setWidth: () => o, setHeight: () => o };
+        return o;
+      },
+    };
+    (
+      m.ctx.SpreadsheetApp as { getUi: () => Record<string, unknown> }
+    ).getUi().showModalDialog = () => {};
+    labels = [...labels, "</script><b>x"];
     vm.runInContext("pmzipPickLabels()", m.ctx);
+    // Dialog lists every label (multi-select), current ones pre-checked, safely embedded.
+    expect(dialogs[0]).toContain('"current":["고객요청"]');
+    expect(dialogs[0]).toContain("운영/이슈");
+    expect(dialogs[0]).not.toContain("</script><b>");
+    expect(dialogs[0]).toContain("\\u003c/script>\\u003cb>x");
+    // Unknown names are dropped; picked labels saved and synced to the sheet list.
+    labels = ["PMZIP", "고객요청", "운영/이슈"];
+    const msg = vm.runInContext(
+      'pmzipSaveLabelPick(["고객요청", "없는라벨", "고객요청"], false)',
+      m.ctx,
+    );
+    expect(msg).toBe("저장했습니다: 고객요청");
+    expect(() =>
+      vm.runInContext("pmzipSaveLabelPick([], false)", m.ctx),
+    ).toThrow("하나 이상");
     const grid = () => m.fake.grids.get("pmzip_settings")!;
     const list = () => {
       const at = grid().findIndex((r) => r[0] === "Gmail 라벨 목록");
@@ -363,13 +390,11 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
         .filter((r) => r[0])
         .map((r) => [r[0], r[1]]);
     };
-    // Seeded from the typed label; sorted names.
     expect(list()).toEqual([
       ["PMZIP", "false"],
       ["고객요청", "true"],
       ["운영/이슈", "false"],
     ]);
-    expect(m.alerts.at(-1)).toContain("라벨 3개를 불러왔습니다");
     // The user ticks one more box in the sheet.
     const row = grid().findIndex((r) => r[0] === "운영/이슈");
     grid()[row][1] = "TRUE";
