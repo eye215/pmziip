@@ -332,3 +332,59 @@ test("DART public financials: sheet sync, quarterly table, idempotent", async ({
     page.getByRole("region", { name: "공시 실적 (DART)" }),
   ).toContainText("변경 없음 · 35개 항목");
 });
+
+test("StatCounter CSV upload: share table with year-ago change and same-month Coach UU", async ({
+  page,
+}) => {
+  const panel = await openPanel(page);
+  // Import GA first so the Coach column (2026-10, country XA/XB) appears.
+  await panel.getByText("파일로 직접 가져오기", { exact: true }).click();
+  await panel
+    .getByLabel("내보내기 JSON 붙여넣기", { exact: true })
+    .fill(await fixture());
+  await panel.getByRole("button", { name: "GA 파일 미리보기" }).click();
+  await panel.getByLabel("기간·조회 정의·품질 경고를 확인했습니다").check();
+  await panel.getByRole("button", { name: "GA 기간 저장" }).click();
+  await openPanel(page);
+
+  const market = page.getByRole("region", {
+    name: "국가별 제조사 점유율 (StatCounter)",
+  });
+  await expect(market).toContainText("판매량·출하량이 아니라");
+  await expect(
+    market.getByRole("link", { name: /StatCounter Global Stats/ }),
+  ).toBeVisible();
+  await market
+    .getByText("StatCounter CSV 직접 올리기", { exact: true })
+    .click();
+  const upload = async (code: string, body: string) => {
+    await market.getByLabel("국가 코드 (예: KR)", { exact: true }).fill(code);
+    await market.getByLabel("또는 CSV 붙여넣기", { exact: true }).fill(body);
+    await market
+      .getByRole("button", { name: "점유율 CSV 가져오기", exact: true })
+      .click();
+  };
+  await upload(
+    "XA",
+    '"Date","VendorA","VendorB","Other"\n2025-10,30.0,40.0,30.0\n2026-10,35.0,37.0,28.0',
+  );
+  await expect(market.getByRole("status")).toContainText("XA 점유율 새 값 6개");
+  await upload("XB", '"Date","VendorA","VendorB"\n2026-10,10,90');
+  await upload("XB", '"Date","VendorA","VendorB"\n2026-10,10,90');
+  await expect(market.getByRole("status")).toContainText(
+    "새 값 0개 · 변경 없음 2개",
+  );
+
+  await market.getByLabel("제조사", { exact: true }).selectOption("VendorA");
+  const table = market.getByRole("table");
+  await expect(table).toContainText("2026-10 Coach 진입 UU");
+  const xa = table.getByRole("row", { name: /XA/ });
+  await expect(xa).toContainText("35.0%");
+  await expect(xa).toContainText("+5.0%p");
+  await expect(xa).toContainText("600");
+  await expect(table.getByRole("row", { name: /XB/ })).toContainText("—");
+
+  await upload("Korea", '"Date","VendorA"\n2026-10,1');
+  await expect(market.getByRole("alert")).toContainText("영문 대문자 2자리");
+  await noOverflow(page);
+});

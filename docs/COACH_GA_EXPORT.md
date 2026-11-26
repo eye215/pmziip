@@ -94,6 +94,19 @@ PM.zip은 GA나 Apps Script에 접속하지 않고, 시트에 쓰지도 않는�
 - API 키는 Apps Script 안에만 있다. 시트와 PM.zip에는 키가 기록되지 않는다(테스트로 확인).
 - 처음 실행하면 IR 실적 발표 자료와 분기 매출을 한 번 대조한다. 특히 분기와 누적 금액의 구분을 확인한다.
 
+## 국가별 제조사 점유율 (StatCounter) 추가 설정
+
+[StatCounter Global Stats](https://gs.statcounter.com/)의 국가별·월별 **모바일 제조사 이용 점유율**이다. 판매량이나 출하량이 아니라 웹 트래픽 기반이다. 라이선스는 CC BY-SA 3.0이며, 공유하거나 보고서에 쓸 때 출처를 표기한다.
+
+1. 같은 Apps Script 프로젝트에 **파일 추가 → 스크립트**로 `StatCounter`를 만들고 [`StatCounter.gs`](../tools/apps-script/coach-ga-export/StatCounter.gs)를 붙여넣는다.
+2. 스크립트 속성 `STATCOUNTER_COUNTRIES`에 ISO 2자리 국가 코드를 넣는다. 예: `KR,US,IN,BR`. Coach GA의 `countryId`와 같은 코드를 쓰면 같은 달 Coach 국가별 UU가 옆에 표시된다.
+3. `exportStatCounterToSheet`를 실행한다. `pmzip_statcounter`, `pmzip_statcounter_summary` 탭이 생기는지 확인한다. 이후 `dailyExport`가 매일 함께 갱신한다. 국가당 요청은 1회이고 요청 사이에 1.5초씩 쉰다.
+4. PM.zip **백업·가져오기 → 국가별 제조사 점유율 → GA 시트와 같은 시트 사용 → 점유율 시트 연결**을 누른다.
+
+- StatCounter에는 공식 API가 없다. 기본 주소는 사이트의 "Download Data" CSV 링크 형식을 따른 것이라 **미검증**이다. 실패하면 시트 `pmzip_statcounter`의 경고나 PM.zip 동기화 오류에 국가별 HTTP 오류가 나온다. 이때 사이트에서 받은 CSV 링크 형식으로 스크립트 속성 `STATCOUNTER_URL_TEMPLATE`을 넣는다. 자리표시자는 `{CODE}`, `{FROM}`, `{TO}`, `{FROM_DASH}`, `{TO_DASH}`이다.
+- **예비 경로**: gs.statcounter.com에서 Mobile Vendor Market Share, 국가, Monthly로 설정하고 Download Data로 CSV를 받는다. PM.zip의 "StatCounter CSV 직접 올리기"에 국가 코드와 함께 올린다.
+- 화면에는 제조사를 고르면 국가별 최근 월 점유율, 1년 전 같은 달, 변화(%p)가 나온다. GA 한 달 전체 기간을 가져온 경우에는 그달 점유율과 Coach 진입 UU를 함께 표시한다. 상관이나 인과는 계산하거나 주장하지 않는다.
+
 ## 검증 상태
 
 - **단위 테스트**
@@ -107,7 +120,11 @@ PM.zip은 GA나 Apps Script에 접속하지 않고, 시트에 쓰지도 않는�
 - **DART 테스트**
   - 단위: `Dart.gs`를 합성 DART 응답으로 실행해 분기값, 4분기 계산, 미공시 분기, 미집계, 오류 시 미기록, API 키 비노출을 확인한다. 분기 표의 영업이익률·전년동기 대비(YoY) 계산과 N/A 처리, 같은 공시의 중복 저장 방지도 확인한다.
   - e2e: 합성 CSV로 시트 연결 → 분기 표 → 재동기화 시 변경 없음을 확인한다.
+- **StatCounter 테스트**
+  - 단위: `StatCounter.gs`를 합성 CSV로 실행해 국가별 1회 요청, 실패 국가 경고, 시트 왕복을 확인한다. CSV 파싱 오류, 1년 전 대비 %p, 값이 바뀔 때만 추가하는 저장도 확인한다.
+  - e2e: CSV 업로드 → 표 → 같은 달 Coach UU → 잘못된 국가 코드 거부를 확인한다.
 - **미검증**
+  - StatCounter 자동 다운로드 URL
   - 실제 OpenDART 호출, `findDartCorpCode`(corpCode.zip 해제)
   - 실제 GA 속성에서 Apps Script 실행
   - 실제 Google 시트 gviz CSV의 응답 형식과 브라우저 교차 출처(CORS) 허용. 개발 환경에서 docs.google.com 접속이 차단되어 확인하지 못했다.
