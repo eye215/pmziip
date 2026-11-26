@@ -29,7 +29,7 @@ import {
   sheetIdFrom,
   SHEET_TAB,
 } from "../../lib/connectors/sheet-source";
-import { session } from "../records/browser-store";
+import { changeView, session } from "../records/browser-store";
 import "./coach-data.css";
 
 type ProjectOption = {
@@ -57,10 +57,10 @@ const percent = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
 const decimal = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 });
-function showCount(v: number | null) {
+export function showCount(v: number | null) {
   return v === null ? "미집계" : number.format(v);
 }
-function show(v: MetricValue, kind: "percent" | "decimal") {
+export function show(v: MetricValue, kind: "percent" | "decimal") {
   if (v.value === null)
     return v.reason === "denominator_zero" ? "N/A (분모 0)" : "미집계";
   return kind === "percent" ? percent.format(v.value) : decimal.format(v.value);
@@ -109,7 +109,7 @@ function errorText(e: unknown) {
   return e instanceof Error ? e.message : "처리하지 못했습니다.";
 }
 
-function Metrics({ period }: { period: CoachPeriod }) {
+export function Metrics({ period }: { period: CoachPeriod }) {
   const m = coachMetrics(period);
   const rows: [string, string][] = [
     ["진입 UU / 횟수", `${showCount(m.mainUsers)} / ${showCount(m.mainCount)}`],
@@ -149,7 +149,7 @@ function Metrics({ period }: { period: CoachPeriod }) {
     </dl>
   );
 }
-function Warnings({ period }: { period: CoachPeriod }) {
+export function Warnings({ period }: { period: CoachPeriod }) {
   const list = coachWarnings(period);
   if (!list.length) return null;
   return (
@@ -160,7 +160,7 @@ function Warnings({ period }: { period: CoachPeriod }) {
     </ul>
   );
 }
-function Breakdown({ period }: { period: CoachPeriod }) {
+export function Breakdown({ period }: { period: CoachPeriod }) {
   const tables: [string, CoachPeriod["byCountry"]][] = [
     ["국가별", period.byCountry],
     ["Sales Case별", period.bySalesCase],
@@ -408,14 +408,10 @@ export function CoachDataPanel({ projects }: { projects: ProjectOption[] }) {
   return (
     <section className="panel coach-data" aria-labelledby={`${ids}-heading`}>
       <h2 id={`${ids}-heading`}>Galaxy Coach GA 가져오기</h2>
-      <p>
-        내보내기용 Apps Script가 만든 결과를 공유 시트에서 자동으로 읽거나
-        파일로 가져옵니다. PM.zip은 GA·Apps Script에 직접 접속하거나 시트에 쓰지
-        않으며, 조회 정의가 coach-ga4-1.2와 다르면 거부합니다.
-      </p>
-      <p className="notice">
-        실제 회사 수치는 조직 승인 후에만 가져오세요. 가져온 기간은 이
-        브라우저에만 저장되며, 다른 기기에서는 같은 시트를 연결하면 됩니다.
+      <p className="subtle">
+        Apps Script가 매일 공유 시트에 쓰는 GA 결과를 읽기만 합니다. 조회 정의가
+        coach-ga4-1.2와 다르면 거부합니다. 가져온 값은 이 브라우저에만
+        저장됩니다.
       </p>
       {store.error && (
         <p role="alert" className="error-box">
@@ -455,10 +451,8 @@ export function CoachDataPanel({ projects }: { projects: ProjectOption[] }) {
             {!source ? (
               <>
                 <p className="subtle">
-                  내보내기용 Apps Script가 매일 기록하는 스프레드시트를
-                  연결합니다. 링크가 있는 사용자 보기 권한으로 공유된 시트의{" "}
-                  {SHEET_TAB} 탭만 읽고, 시트에 쓰지 않습니다. 링크는 이
-                  브라우저에만 저장됩니다.
+                  링크 보기 권한으로 공유한 시트의 {SHEET_TAB} 탭을 읽습니다.
+                  링크는 이 브라우저에만 저장됩니다.
                 </p>
                 <div className="field">
                   <label htmlFor={`${ids}-sheet`}>
@@ -643,61 +637,51 @@ export function CoachDataPanel({ projects }: { projects: ProjectOption[] }) {
               </div>
             )}
           </details>
-          <h3 className="coach-saved-heading">저장된 기간</h3>
-          {store.loaded && store.loaded.state.snapshots.length > 0 && (
-            <div className="actions">
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    // Imported periods only; the sheet link is not included.
-                    const url = URL.createObjectURL(
-                      new Blob([JSON.stringify(store.loaded!.state, null, 2)], {
-                        type: "application/json",
-                      }),
-                    );
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "pmzip-coach-ga-backup.json";
-                    a.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
-                  } catch {
-                    setError("GA 가져오기 백업 파일을 만들지 못했습니다.");
-                  }
-                }}
-              >
-                GA 가져오기 기록 백업
-              </button>
-            </div>
-          )}
-          {!saved.length ? (
-            <p className="empty-state">
-              이 프로젝트에 가져온 GA 기간이 없습니다.
-            </p>
-          ) : (
-            saved.map(({ latest, history }) => (
-              <article
-                key={latest.id}
-                className="record-row"
-                aria-label={`${latest.period.startDate}~${latest.period.endDate} GA 기간`}
-              >
-                <span className="badge">
-                  Apps Script 내보내기 · {latest.definitionVersion}
-                  {history > 1 ? ` · 재수집 ${history - 1}회` : ""}
-                </span>
-                <h3>
-                  {latest.period.startDate} ~ {latest.period.endDate}
-                </h3>
-                <p className="subtle">
-                  GA 생성 {latest.generatedAt} · 가져옴 {latest.importedAt} · GA
-                  시간대 {latest.propertyTimeZone || "미기록"}
-                </p>
-                <Warnings period={latest.period} />
-                <Metrics period={latest.period} />
-                <Breakdown period={latest.period} />
-              </article>
-            ))
-          )}
+          <div className="connector-summary">
+            <span>
+              저장된 기간 {saved.length}개
+              {saved.length
+                ? ` · 최근 ${saved[0].latest.period.startDate}~${saved[0].latest.period.endDate}`
+                : ""}
+            </span>
+            <span className="actions">
+              {saved.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => changeView({ tab: "perf" })}
+                >
+                  성과 탭에서 보기
+                </button>
+              )}
+              {store.loaded && store.loaded.state.snapshots.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      // Imported periods only; the sheet link is not included.
+                      const url = URL.createObjectURL(
+                        new Blob(
+                          [JSON.stringify(store.loaded!.state, null, 2)],
+                          {
+                            type: "application/json",
+                          },
+                        ),
+                      );
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "pmzip-coach-ga-backup.json";
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    } catch {
+                      setError("GA 가져오기 백업 파일을 만들지 못했습니다.");
+                    }
+                  }}
+                >
+                  GA 가져오기 기록 백업
+                </button>
+              )}
+            </span>
+          </div>
         </>
       )}
     </section>
