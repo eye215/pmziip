@@ -156,11 +156,21 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         key: it.externalId,
         title: trim(it.title || "(제목 없음)", 200),
         body: it.body || it.title,
-        sourceType: it.channel === "gmail" ? "mail" : "other",
+        sourceType:
+          it.channel === "gmail"
+            ? "mail"
+            : it.channel === "slack"
+              ? "slack"
+              : "other",
         reference: it.link,
         collectedAt: it.receivedAt,
         requesterRole: it.fromDomain ? `보낸 곳 ${it.fromDomain}` : "",
-        channelLabel: it.channel === "gmail" ? "Gmail" : "캘린더",
+        channelLabel:
+          it.channel === "gmail"
+            ? "Gmail"
+            : it.channel === "slack"
+              ? "Slack"
+              : "캘린더",
         duplicate: isDuplicate(it.body || it.title, it.link),
         candidates: extractCandidates(`${it.title}\n\n${it.body}`),
       })),
