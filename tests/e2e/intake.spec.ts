@@ -201,6 +201,48 @@ test("Gmail·Calendar export file: review, skip items without candidates, keep l
   await noOverflow(page);
 });
 
+test("automated notifications are hidden, unselected and propose nothing", async ({
+  page,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const data = JSON.parse(
+    await readFile("tests/fixtures/inbox-export.synthetic.json", "utf8"),
+  );
+  data.items.push({
+    channel: "gmail",
+    externalId: "gmail:synthetic-notice",
+    title: '"[합성] 개편안.docx"에 대한 공유 요청',
+    body: "[이메일]님이 다음 문서에 대한 액세스를 요청합니다.\n문서의 소유자로서 액세스 권한을 제공하려면 공동작업자 또는 뷰어로 추가하세요.",
+    fromDomain: "@google.com",
+    receivedAt: "2026-11-18T01:00:00Z",
+    link: "https://mail.google.com/mail/u/0/#all/synthetic-notice",
+  });
+  const intake = await openIntake(page);
+  await intake.getByRole("button", { name: "Gmail·캘린더 파일" }).click();
+  await intake.getByLabel("Gmail·캘린더 내보내기 파일").setInputFiles({
+    name: "inbox.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(data)),
+  });
+  await expect(intake.getByRole("status").first()).toContainText("4건 · 후보");
+  await expect(intake.getByRole("status").first()).toContainText(
+    "자동 알림 1건",
+  );
+  const notice = intake.getByRole("article", {
+    name: '"[합성] 개편안.docx"에 대한 공유 요청 수집 후보',
+  });
+  await expect(notice).toHaveCount(0); // hidden by default
+  await intake.getByRole("button", { name: "자동 알림 1건 보기" }).click();
+  await expect(notice).toContainText("자동 알림(문서 공유·액세스 알림)");
+  await expect(notice.getByRole("checkbox").first()).not.toBeChecked();
+  await expect(notice.getByLabel("후보 제목")).toHaveCount(0);
+  // Only the person-written mail with candidates is preselected.
+  await expect(
+    intake.getByRole("button", { name: "수집함에 등록 (원문 2건)" }),
+  ).toBeVisible();
+  await noOverflow(page);
+});
+
 test("shared sheet (pmzip_inbox): read with the GA sheet link, review, register", async ({
   page,
 }) => {

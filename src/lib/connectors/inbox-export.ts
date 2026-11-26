@@ -35,7 +35,8 @@ export const inboxExportSchema = z
         calendarDays: z.number().int().nullable(),
       })
       .strict(),
-    items: z.array(item).max(500),
+    // Gmail ≤300 + calendar ≤100 + Slack ≤300 per export (Inbox.gs caps).
+    items: z.array(item).max(1000),
   })
   .strict();
 export type InboxExport = z.infer<typeof inboxExportSchema>;

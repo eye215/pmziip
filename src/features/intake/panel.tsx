@@ -1,6 +1,7 @@
 "use client";
 import { useId, useState } from "react";
 import { z } from "zod";
+import { autoNoticeReason } from "../../lib/connectors/auto-notice";
 import {
   EXTRACT_VERSION,
   extractCandidates,
@@ -46,6 +47,8 @@ type Message = {
   requesterRole: string;
   channelLabel: string;
   duplicate: boolean;
+  /** Automated notification (reason), hidden and not proposed by default. */
+  auto: string | null;
   candidates: Candidate[];
 };
 type Pick = {
@@ -111,6 +114,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
     count: number;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showAuto, setShowAuto] = useState(false);
 
   const isDuplicate = (body: string, reference: string) =>
     state.sources.some(
@@ -123,7 +127,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         list.map((m) => [
           m.key,
           {
-            source: !m.duplicate && m.candidates.length > 0,
+            source: !m.duplicate && !m.auto && m.candidates.length > 0,
             candidates: Object.fromEntries(
               m.candidates.map((c) => [c.key, { on: true, title: c.title }]),
             ),
@@ -154,6 +158,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         requesterRole: "",
         channelLabel: ch.label,
         duplicate: isDuplicate(body, ""),
+        auto: null,
         candidates,
       },
     ]);
@@ -180,7 +185,16 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
               ? "Slack"
               : "캘린더",
         duplicate: isDuplicate(it.body || it.title, it.link),
-        candidates: extractCandidates(`${it.title}\n\n${it.body}`),
+        ...(() => {
+          const auto = autoNoticeReason(it);
+          // Notifications keep their original but propose no requirement.
+          return {
+            auto,
+            candidates: auto
+              ? []
+              : extractCandidates(`${it.title}\n\n${it.body}`),
+          };
+        })(),
       })),
     );
   }
@@ -235,6 +249,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
     }
   }
 
+  const autoCount = (messages ?? []).filter((m) => m.auto).length;
   const chosen = (messages ?? []).filter((m) => picks[m.key]?.source);
   const workCount = makeWork
     ? chosen.reduce(
@@ -482,49 +497,95 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
             {messages.some((m) => m.duplicate)
               ? ` · 이미 수집함에 있음 ${messages.filter((m) => m.duplicate).length}건`
               : ""}
+            {autoCount ? ` · 자동 알림 ${autoCount}건` : ""}
           </p>
-          {messages.map((m) => {
-            const pick = picks[m.key];
-            return (
-              <article
-                key={m.key}
-                className="record-row"
-                aria-label={`${m.title} 수집 후보`}
+          {autoCount ? (
+            <div className="actions">
+              <button
+                type="button"
+                aria-pressed={showAuto}
+                onClick={() => setShowAuto(!showAuto)}
               >
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={pick?.source ?? false}
-                    disabled={m.duplicate}
-                    onChange={(e) =>
-                      setPicks({
-                        ...picks,
-                        [m.key]: { ...pick, source: e.target.checked },
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>{m.title}</strong>
-                    <span className="subtle">
-                      {" "}
-                      · {m.channelLabel} · {m.collectedAt.slice(0, 10)}
-                      {m.requesterRole ? ` · ${m.requesterRole}` : ""}
-                      {m.duplicate ? " · 이미 등록됨" : ""}
+                {showAuto
+                  ? `자동 알림 ${autoCount}건 숨기기`
+                  : `자동 알림 ${autoCount}건 보기`}
+              </button>
+              <span className="subtle">
+                문서 공유·댓글·초대 같은 자동 알림은 후보를 만들지 않고 기본으로
+                선택하지 않습니다.
+              </span>
+            </div>
+          ) : null}
+          {messages
+            .filter((m) => showAuto || !m.auto)
+            .map((m) => {
+              const pick = picks[m.key];
+              return (
+                <article
+                  key={m.key}
+                  className="record-row"
+                  aria-label={`${m.title} 수집 후보`}
+                >
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={pick?.source ?? false}
+                      disabled={m.duplicate}
+                      onChange={(e) =>
+                        setPicks({
+                          ...picks,
+                          [m.key]: { ...pick, source: e.target.checked },
+                        })
+                      }
+                    />
+                    <span>
+                      <strong>{m.title}</strong>
+                      <span className="subtle">
+                        {" "}
+                        · {m.channelLabel} · {m.collectedAt.slice(0, 10)}
+                        {m.requesterRole ? ` · ${m.requesterRole}` : ""}
+                        {m.duplicate ? " · 이미 등록됨" : ""}
+                        {m.auto ? ` · 자동 알림(${m.auto})` : ""}
+                      </span>
                     </span>
-                  </span>
-                </label>
-                {m.candidates.length ? (
-                  <ul className="intake-candidates">
-                    {m.candidates.map((c) => {
-                      const cp = pick?.candidates[c.key];
-                      return (
-                        <li key={c.key}>
-                          <label className="check">
+                  </label>
+                  {m.candidates.length ? (
+                    <ul className="intake-candidates">
+                      {m.candidates.map((c) => {
+                        const cp = pick?.candidates[c.key];
+                        return (
+                          <li key={c.key}>
+                            <label className="check">
+                              <input
+                                type="checkbox"
+                                checked={cp?.on ?? false}
+                                disabled={!pick?.source || !makeWork}
+                                aria-label={`${c.title} 과제 초안`}
+                                onChange={(e) =>
+                                  setPicks({
+                                    ...picks,
+                                    [m.key]: {
+                                      ...pick,
+                                      candidates: {
+                                        ...pick.candidates,
+                                        [c.key]: {
+                                          ...cp,
+                                          on: e.target.checked,
+                                        },
+                                      },
+                                    },
+                                  })
+                                }
+                              />
+                              <span className={`intake-type intake-${c.type}`}>
+                                {typeNames[c.type]}
+                              </span>
+                            </label>
                             <input
-                              type="checkbox"
-                              checked={cp?.on ?? false}
+                              className="intake-title"
+                              aria-label="후보 제목"
+                              value={cp?.title ?? c.title}
                               disabled={!pick?.source || !makeWork}
-                              aria-label={`${c.title} 과제 초안`}
                               onChange={(e) =>
                                 setPicks({
                                   ...picks,
@@ -532,54 +593,34 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                                     ...pick,
                                     candidates: {
                                       ...pick.candidates,
-                                      [c.key]: { ...cp, on: e.target.checked },
+                                      [c.key]: { ...cp, title: e.target.value },
                                     },
                                   },
                                 })
                               }
                             />
-                            <span className={`intake-type intake-${c.type}`}>
-                              {typeNames[c.type]}
+                            <span className="subtle">
+                              {c.due ? `기한: ${c.due} · ` : ""}근거:{" "}
+                              {c.matched.join(", ")}
                             </span>
-                          </label>
-                          <input
-                            className="intake-title"
-                            aria-label="후보 제목"
-                            value={cp?.title ?? c.title}
-                            disabled={!pick?.source || !makeWork}
-                            onChange={(e) =>
-                              setPicks({
-                                ...picks,
-                                [m.key]: {
-                                  ...pick,
-                                  candidates: {
-                                    ...pick.candidates,
-                                    [c.key]: { ...cp, title: e.target.value },
-                                  },
-                                },
-                              })
-                            }
-                          />
-                          <span className="subtle">
-                            {c.due ? `기한: ${c.due} · ` : ""}근거:{" "}
-                            {c.matched.join(", ")}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p className="subtle">
-                    요구사항 후보를 찾지 못했습니다. 필요하면 원문만 등록하세요.
-                  </p>
-                )}
-                <details>
-                  <summary>원문 보기</summary>
-                  <pre>{trim(m.body, 4000)}</pre>
-                </details>
-              </article>
-            );
-          })}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="subtle">
+                      {m.auto
+                        ? "자동 알림이라 요구사항 후보를 만들지 않았습니다. 필요하면 원문만 등록하세요."
+                        : "요구사항 후보를 찾지 못했습니다. 필요하면 원문만 등록하세요."}
+                    </p>
+                  )}
+                  <details>
+                    <summary>원문 보기</summary>
+                    <pre>{trim(m.body, 4000)}</pre>
+                  </details>
+                </article>
+              );
+            })}
           <label className="check">
             <input
               type="checkbox"
