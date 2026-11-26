@@ -123,3 +123,5 @@ flowchart LR
 - Teams는 자동 연결 없이 붙여넣기로만 수집한다.
 
 관련 문서: [요구사항 수집](REQUIREMENT_INTAKE.md) · [Coach GA 내보내기](COACH_GA_EXPORT.md) · [진행 현황](PROGRESS.md) · [UI 패턴](UI_PATTERNS.md)
+
+다음 방향: [제품 방향: PM 성과 포트폴리오](09-portfolio-direction.md)

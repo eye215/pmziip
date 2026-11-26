@@ -41,7 +41,7 @@ ESLint는 Next의 React/import/accessibility 플러그인 peer 범위와 맞는 
 - [PRD](docs/01-PRD.md) / [FRD](docs/02-FRD.md) / [Architecture](docs/03-architecture.md)
 - [Phase 순서](docs/04-phases.md) / [인수 테스트](docs/05-tests.md)
 - [v1.2 확장 명세](docs/06-v1.2-spec.md) / [F01~F44 추적표](docs/07-requirements-trace.md)
-- [서비스 IA·기능명세·데이터구조 (현재 구현 기준)](docs/08-service-ia-spec.md)
+- [서비스 IA·기능명세·데이터구조 (현재 구현 기준)](docs/08-service-ia-spec.md) / [제품 방향: PM 성과 포트폴리오](docs/09-portfolio-direction.md)
 - [기반 ADR](docs/adr/0001-foundation.md) / [첨부 코드 검토](docs/REFERENCE_REVIEW.md)
 
 v1.1 원본의 F01~F28/T01~T28은 보존하고 F29~F44/T29~T44를 추가했습니다. 합성 모드 검증을 실제 인증·DB 인수 완료로 표시하지 않습니다. [Phase 1 구현 및 검증](docs/PHASE1.md)에 완료 범위와 보류 항목을 기록합니다. 원본 HTML은 `reference/pmzip.html`에 바이트 그대로 보존했습니다. 이전 개발 README도 `reference/README-v1.1.md`에 있습니다.
