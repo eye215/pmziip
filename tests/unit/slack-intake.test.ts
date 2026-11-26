@@ -71,6 +71,7 @@ function world(props: Record<string, string>) {
     getRange: () => {
       const r = {
         setNumberFormat: () => r,
+        setValue: (v: string) => void sheets.set(name + "!B1", [[String(v)]]),
         setValues: (rows: string[][]) =>
           void sheets.set(
             name,
@@ -180,6 +181,37 @@ describe("Slack.gs intake", () => {
     expect(text).not.toContain(TOKEN);
     expect(inboxExportSchema.parse(JSON.parse(text)).items[0].body).toContain(
       "[전화번호]",
+    );
+  });
+  it("writes a status line (counts and reasons) to B1, and Slack errors do not stop mail", () => {
+    const w = world({
+      SLACK_BOT_TOKEN: TOKEN,
+      SLACK_CHANNELS: "pj-coach, unknown-channel",
+      INBOX_SHEET: "on",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    const status = vm.runInContext("exportInboxToSheet()", w.ctx);
+    expect(status).toBe(
+      "Gmail 0건 (라벨 PMZIP, 최근 30일) · 캘린더 끔 · Slack 1건 — Slack 채널을 찾지 못했거나 봇이 초대되지 않았습니다: unknown-channel",
+    );
+    expect(w.sheets.get("pmzip_inbox!B1")![0][0]).toContain(status);
+    expect(w.sheets.get("pmzip_inbox!B1")![0][0]).not.toContain(TOKEN);
+
+    const bad = world({
+      SLACK_BOT_TOKEN: TOKEN,
+      SLACK_CHANNELS: "pj-coach",
+      INBOX_SHEET: "on",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    (bad.ctx.UrlFetchApp as { fetch: unknown }).fetch = () => ({
+      getResponseCode: () => 200,
+      getContentText: () =>
+        JSON.stringify({ ok: false, error: "missing_scope" }),
+    });
+    const s2 = vm.runInContext("exportInboxToSheet()", bad.ctx);
+    expect(s2).toContain("Slack 실패 — Slack auth.test: missing_scope");
+    expect(bad.sheets.get("pmzip_inbox")![0][0]).toMatch(
+      /^pmzip\.inbox-export\.chunks\|v1\|/,
     );
   });
   it("does nothing without a token, and notes channels it cannot see", () => {

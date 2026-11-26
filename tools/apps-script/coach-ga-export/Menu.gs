@@ -13,6 +13,7 @@ function onOpen() {
     .addItem('Slack 채널 설정', 'pmzipSetSlackChannels')
     .addSeparator()
     .addItem('요구사항 메일 지금 가져오기', 'pmzipRunInboxNow')
+    .addItem('요구사항 메일 매일 자동 수집 켜기', 'pmzipInstallInboxTrigger')
     .addItem('GA·공시·점유율 지금 갱신', 'dailyExport')
     .addSeparator()
     .addItem('현재 설정 보기', 'pmzipShowSettings')
@@ -124,8 +125,23 @@ function pmzipRunInboxNow() {
     if (ok !== ui.Button.YES) return;
     props.setProperty('INBOX_SHEET', 'on');
   }
-  exportInboxToSheet();
-  ui.alert('pmzip_inbox 탭을 갱신했습니다. PM.zip의 통합 수집함 > 요구사항 수집에서 "시트에서 새 메일 확인"을 누르세요.');
+  var status = exportInboxToSheet();
+  ui.alert(
+    'pmzip_inbox 탭을 갱신했습니다.\n\n' + status +
+      '\n\nPM.zip의 통합 수집함 > 요구사항 수집에서 "시트에서 새 메일 확인"을 누르세요.' +
+      (/^Gmail 0건/.test(status) ? '\n\nGmail이 0건이면: 이 계정에 해당 라벨이 붙은 최근 메일이 있는지, 메뉴 "가져올 Gmail 라벨 설정"을 확인하세요.' : ''),
+  );
+}
+
+/** Installs the daily trigger as the account clicking the menu (the mail account). */
+function pmzipInstallInboxTrigger() {
+  var ui = SpreadsheetApp.getUi();
+  if (pmzipProps_().getProperty('INBOX_SHEET') !== 'on') {
+    ui.alert('먼저 "요구사항 메일 지금 가져오기"를 한 번 실행해 공유 시트 기록을 켜 주세요.');
+    return;
+  }
+  installInboxTrigger();
+  ui.alert('매일 07시대에 지금 이 계정의 메일을 가져오도록 설정했습니다. 메일을 읽을 계정으로 로그인한 상태에서 눌러야 합니다.');
 }
 
 function pmzipShowSettings() {

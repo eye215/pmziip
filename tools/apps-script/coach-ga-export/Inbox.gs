@@ -8,7 +8,9 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.0.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.1.0' };
+/** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
+var INBOX_LAST_STATUS_ = '';
 var INBOX_MAX_ITEMS = 300;
 var INBOX_MAX_BODY = 20000;
 
@@ -72,13 +74,29 @@ function buildInboxExport_() {
       });
     });
   }
+  var nGmail = items.filter(function (it) { return it.channel === 'gmail'; }).length;
+  var nCal = items.length - nGmail;
   var notes = [];
+  var slackPart = 'Slack 미설정';
   if (typeof slackItems_ === 'function') {
-    var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
-    items = items.concat(slack.items);
-    notes = slack.notes;
+    try {
+      var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
+      items = items.concat(slack.items);
+      notes = slack.notes;
+      var on = props.getProperty('SLACK_BOT_TOKEN') && props.getProperty('SLACK_CHANNELS');
+      slackPart = on ? 'Slack ' + slack.items.length + '건' : 'Slack 미설정(토큰·채널)';
+    } catch (e) {
+      // Mail and calendar still go out when Slack fails.
+      slackPart = 'Slack 실패';
+      notes.push(String(e && e.message || e).slice(0, 200));
+    }
   }
-  if (notes.length) Logger.log(notes.join(' / '));
+  INBOX_LAST_STATUS_ = [
+    'Gmail ' + nGmail + '건 (' + (query ? '검색식' : '라벨 ' + label) + ', 최근 ' + days + '일)',
+    calDays > 0 ? '캘린더 ' + nCal + '건' : '캘린더 끔',
+    slackPart,
+  ].join(' · ') + (notes.length ? ' — ' + notes.join(' / ') : '');
+  Logger.log(INBOX_LAST_STATUS_);
   return {
     format: 'pmzip.inbox-export',
     formatVersion: 1,
@@ -140,11 +158,17 @@ function exportInboxToSheet() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    writeChunks_(sheet_(ss, INBOX_TAB), asciiJson_(data), INBOX_CHUNK_HEADER);
+    var tab = sheet_(ss, INBOX_TAB);
+    writeChunks_(tab, asciiJson_(data), INBOX_CHUNK_HEADER);
+    // Column B is not read by PM.zip; it shows when and what was collected.
+    tab.getRange(1, 2).setNumberFormat('@').setValue(
+      '마지막 실행 ' + data.generatedAt + ' · ' + INBOX_LAST_STATUS_,
+    );
   } finally {
     lock.releaseLock();
   }
   Logger.log('pmzip_inbox: ' + data.items.length + '건');
+  return INBOX_LAST_STATUS_;
 }
 
 /** Daily 07:00-08:00 trigger for exportInboxToSheet, owned by the account running this. */
