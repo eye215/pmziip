@@ -149,6 +149,36 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   await expect(
     again.getByRole("button", { name: "GA 기간 저장", exact: true }),
   ).toBeDisabled();
+
+  // Backup of imported periods (sheet link is never included).
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    again
+      .getByRole("button", { name: "GA 가져오기 기록 백업", exact: true })
+      .click(),
+  ]);
+  const backup = await readFile((await download.path())!, "utf8");
+  expect(JSON.parse(backup).snapshots).toHaveLength(2);
+  expect(backup).not.toContain("sheetId");
+
+  // Coach card shows the latest full month; other projects stay "미수집".
+  await page
+    .getByRole("navigation", { name: "워크스페이스 메뉴" })
+    .getByRole("button", { name: "프로젝트", exact: true })
+    .click();
+  const card = page.getByRole("article", {
+    name: "Demo Coach 프로젝트",
+    exact: true,
+  });
+  await expect(card.locator(".metrics")).toContainText("훈련 완료율75%");
+  await expect(card.locator(".metrics")).toContainText("평균 평가점수4");
+  await expect(card).toContainText("GA 2026-10-01~2026-10-31");
+  await expect(
+    page
+      .getByRole("article", { name: "Demo Survey 프로젝트", exact: true })
+      .locator(".metrics"),
+  ).toContainText("미수집");
+  await noOverflow(page);
 });
 
 /** Same chunk layout as Code.gs exportToSheet, served like gviz CSV. */
