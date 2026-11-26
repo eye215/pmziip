@@ -65,13 +65,16 @@ function installDailyTrigger() {
   ScriptApp.newTrigger('dailyExport').timeBased().everyDays(1).atHour(6).create();
 }
 
-/** Daily job: GA export, then DART public financials if configured (Dart.gs). */
+/** Daily job: GA export, then DART (Dart.gs) and StatCounter (StatCounter.gs) if configured. */
 function dailyExport() {
   var errors = [];
   try { exportToSheet(); } catch (e) { errors.push('GA: ' + e.message); }
   var props = PropertiesService.getScriptProperties();
   if (props.getProperty('DART_API_KEY') && props.getProperty('DART_CORP_CODE')) {
     try { exportDartToSheet(); } catch (e) { errors.push('DART: ' + e.message); }
+  }
+  if (props.getProperty('STATCOUNTER_COUNTRIES')) {
+    try { exportStatCounterToSheet(); } catch (e) { errors.push('StatCounter: ' + e.message); }
   }
   if (errors.length) throw new Error(errors.join(' / '));
 }
