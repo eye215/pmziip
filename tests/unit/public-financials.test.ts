@@ -410,3 +410,35 @@ describe("findDartCorpCode (corpCode.zip without a zip content type)", () => {
     expect(() => run({ zip: true }, "000003").result()).toThrow("000003");
   });
 });
+
+describe("Q4 when the 3분기 누적 amount is blank", () => {
+  it("falls back to Q1+Q2+Q3 and notes only what is still missing, once", () => {
+    const blankCum = (url: string) => {
+      const r = okDart(url);
+      const u = new URL(url);
+      if (
+        u.searchParams.get("reprt_code") === "11014" &&
+        Array.isArray((r.body as { list?: unknown[] }).list)
+      )
+        (r.body as { list: Record<string, string>[] }).list = (
+          r.body as { list: Record<string, string>[] }
+        ).list.map((x) => ({ ...x, thstrm_add_amount: "" }));
+      return r;
+    };
+    const { ctx } = sandbox(blankCum);
+    const file = publicFinSchema.parse(
+      JSON.parse(JSON.stringify(vm.runInContext("buildDartExport_()", ctx))),
+    );
+    const q4 = file.rows.find(
+      (r) =>
+        r.year === 2025 &&
+        r.quarter === 4 &&
+        r.account === "revenue" &&
+        r.fsDiv === "CFS",
+    );
+    // 400 − (90 + 100 + 100) = 110, same as with the cumulative amount.
+    expect(q4).toMatchObject({ amount: 110e12, basis: "derived_q4" });
+    expect(file.notes).toEqual([]);
+    expect(file.generator.version).toBe("1.1.0");
+  });
+});

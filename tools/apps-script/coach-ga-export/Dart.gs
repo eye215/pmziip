@@ -10,7 +10,7 @@
 var DART_TAB = 'pmzip_dart';
 var DART_SUMMARY_TAB = 'pmzip_dart_summary';
 var DART_CHUNK_HEADER = 'pmzip.public-financials.chunks';
-var DART_GENERATOR = { name: 'Dart.gs', version: '1.0.0' };
+var DART_GENERATOR = { name: 'Dart.gs', version: '1.1.0' };
 var DART_YEARS = 3; // current year and the two before
 // reprt_code → quarter. 11011 = 사업보고서 (full year, Q4 is derived).
 var DART_REPORTS = [
@@ -112,19 +112,29 @@ function buildDartExport_() {
           });
         });
       });
-      // Q4 = full year (사업보고서) − Q1~Q3 cumulative (3분기보고서 누적). Derived, labelled.
+      // Q4 = full year (사업보고서) − Q1~Q3. Prefer the 3분기 누적 amount; when a
+      // company leaves it blank, use Q1+Q2+Q3 quarterly amounts. Derived, labelled.
+      var quarterAmount = function (q, fsDiv, account) {
+        var row = byQuarter[q].filter(function (z) { return z.fs_div === fsDiv && dartAccount_(z.account_nm) === account; })[0];
+        return row ? dartAmount_(row.thstrm_amount) : null;
+      };
       byQuarter[4].forEach(function (x) {
         var account = dartAccount_(x.account_nm);
         if (!account) return;
         var annual = dartAmount_(x.thstrm_amount);
         var q3 = byQuarter[3].filter(function (z) { return z.fs_div === x.fs_div && dartAccount_(z.account_nm) === account; })[0];
         var cum = q3 ? dartAmount_(q3.thstrm_add_amount) : null;
+        if (cum === null) {
+          var parts = [1, 2, 3].map(function (q) { return quarterAmount(q, x.fs_div, account); });
+          if (parts.every(function (v) { return v !== null; })) cum = parts[0] + parts[1] + parts[2];
+        }
         push({
           corpCode: corp, year: y, quarter: 4, fsDiv: x.fs_div, account: account, accountName: x.account_nm,
           amount: annual === null || cum === null ? null : annual - cum, basis: 'derived_q4',
           reportCode: x.reprt_code, rceptNo: x.rcept_no, currency: x.currency || 'KRW',
         });
-        if (cum === null) notes.push(corp + ' ' + y + '년 4분기는 3분기 누적값이 없어 미집계입니다.');
+        var note = corp + ' ' + y + '년 4분기는 1~3분기 값이 없어 미집계입니다.';
+        if ((annual === null || cum === null) && notes.indexOf(note) < 0) notes.push(note);
       });
     }
   });

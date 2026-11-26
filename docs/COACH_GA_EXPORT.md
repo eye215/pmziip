@@ -100,7 +100,12 @@ PM.zip은 GA나 Apps Script에 접속하지 않고, 시트에 쓰지도 않는�
 
 1. 같은 Apps Script 프로젝트에 **파일 추가 → 스크립트**로 `StatCounter`를 만들고 [`StatCounter.gs`](../tools/apps-script/coach-ga-export/StatCounter.gs)를 붙여넣는다.
 2. 스크립트 속성 `STATCOUNTER_COUNTRIES`에 ISO 2자리 국가 코드를 넣는다. 예: `KR,US,IN,BR`. Coach GA의 `countryId`와 같은 코드를 쓰면 같은 달 Coach 국가별 UU가 옆에 표시된다.
-3. `exportStatCounterToSheet`를 실행한다. `pmzip_statcounter`, `pmzip_statcounter_summary` 탭이 생기는지 확인한다. 이후 `dailyExport`가 매일 함께 갱신한다. 국가당 요청은 1회이고 요청 사이에 1.5초씩 쉰다.
+3. `exportStatCounterToSheet`를 실행한다. `pmzip_statcounter`, `pmzip_statcounter_summary`, `pmzip_statcounter_cache` 탭이 생기는지 확인한다.
+   - 국가가 많아도 된다(100개국 이상). 5개국씩 동시에 받고, 4분 30초가 지나면 받은 만큼만 저장하고 끝난다.
+   - 실행 로그에 "남은 국가 N개"가 나오면 다시 실행한다. 아니면 다음 날 자동 실행이 이어서 받는다.
+   - 받은 국가는 캐시 탭에 저장되고 7일 뒤에 다시 받는다. 실패한 국가는 다음 실행에서 다시 시도한다.
+   - ISO 2자리 국가 코드가 아닌 값(예: 법인·권역 코드)은 건너뛰고 경고에 표시한다.
+   - 국가마다 점유율 상위 8개 제조사만 남기고 나머지는 `Other`로 합산한다. 브라우저 저장 한도 때문이며, 합계 점유율은 유지된다.
 4. PM.zip **백업·가져오기 → 국가별 제조사 점유율 → GA 시트와 같은 시트 사용 → 점유율 시트 연결**을 누른다.
 
 - StatCounter에는 공식 API가 없다. 기본 주소는 사이트의 "Download Data" CSV 링크 형식을 따른 것이라 **미검증**이다. 실패하면 시트 `pmzip_statcounter`의 경고나 PM.zip 동기화 오류에 국가별 HTTP 오류가 나온다. 이때 사이트에서 받은 CSV 링크 형식으로 스크립트 속성 `STATCOUNTER_URL_TEMPLATE`을 넣는다. 자리표시자는 `{CODE}`, `{FROM}`, `{TO}`, `{FROM_DASH}`, `{TO_DASH}`이다.
