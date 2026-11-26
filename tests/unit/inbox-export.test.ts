@@ -111,3 +111,100 @@ describe("Inbox.gs → PM.zip intake contract", () => {
     expect(() => inboxExportSchema.parse(bad)).toThrow();
   });
 });
+
+describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
+  it("cuts quotes/signatures, masks e-mail and phone, keeps domain only", async () => {
+    const { createHash } = await import("node:crypto");
+    const { joinSheetChunks, parseCsv } =
+      await import("../../src/lib/connectors/sheet-source");
+    const { sha256 } = await import("../../src/features/coach-data/store");
+    const sheets = new Map<string, string[][]>();
+    const sheet = (name: string) => ({
+      clearContents: () => sheets.set(name, []),
+      getRange: () => {
+        const r = {
+          setNumberFormat: () => r,
+          setValues: (rows: string[][]) =>
+            void sheets.set(
+              name,
+              rows.map((x) => x.map(String)),
+            ),
+        };
+        return r;
+      },
+    });
+    const ctx: Record<string, unknown> = {
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (k: string) => (k === "INBOX_SHEET" ? "on" : null),
+        }),
+      },
+      GmailApp: {
+        search: () => [
+          {
+            getPermalink: () => "https://mail.google.com/mail/u/0/#all/t1",
+            getMessages: () => [
+              {
+                getId: () => "m1",
+                getSubject: () => "합성 요청 (문의 someone@example.invalid)",
+                getPlainBody: () =>
+                  "필터를 추가해 주세요. 연락처 010-1234-5678, 메일 a.b@example.invalid\n--\n서명 줄\n> 이전 답장",
+                getFrom: () => "합성 <someone@example.invalid>",
+                getDate: () => new Date("2026-11-25T01:00:00Z"),
+              },
+            ],
+          },
+        ],
+      },
+      CalendarApp: {
+        getDefaultCalendar: () => ({ getId: () => "c", getEvents: () => [] }),
+      },
+      Utilities: {
+        base64EncodeWebSafe: (s: string) =>
+          Buffer.from(s).toString("base64url"),
+        computeDigest: (_a: unknown, t: string) =>
+          [...createHash("sha256").update(t, "utf8").digest()].map((b) =>
+            b > 127 ? b - 256 : b,
+          ),
+        DigestAlgorithm: { SHA_256: "SHA_256" },
+        Charset: { UTF_8: "UTF_8" },
+      },
+      Session: { getScriptTimeZone: () => "Asia/Seoul" },
+      Logger: { log: () => {} },
+      SpreadsheetApp: {
+        getActiveSpreadsheet: () => ({
+          getSheetByName: sheet,
+          insertSheet: sheet,
+        }),
+      },
+      LockService: {
+        getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }),
+      },
+    };
+    vm.createContext(ctx);
+    for (const f of ["Code.gs", "Inbox.gs"])
+      vm.runInContext(
+        readFileSync(`tools/apps-script/coach-ga-export/${f}`, "utf8"),
+        ctx,
+      );
+    vm.runInContext("exportInboxToSheet()", ctx);
+    const rows = sheets.get("pmzip_inbox")!;
+    const text = await joinSheetChunks(
+      parseCsv(rows.map((r) => `"${r[0].replaceAll('"', '""')}"`).join("\n")),
+      sha256,
+      "pmzip.inbox-export.chunks",
+      "pmzip_inbox",
+    );
+    const file = inboxExportSchema.parse(JSON.parse(text));
+    const all = JSON.stringify(file);
+    expect(all).not.toContain("@example.invalid>");
+    expect(all).not.toContain("someone@");
+    expect(all).not.toContain("010-1234-5678");
+    expect(all).not.toContain("서명 줄");
+    expect(all).not.toContain("이전 답장");
+    expect(file.items[0].body).toContain("[전화번호]");
+    expect(file.items[0].body).toContain("[이메일]");
+    expect(file.items[0].title).toBe("합성 요청 (문의 [이메일])");
+    expect(file.items[0].fromDomain).toBe("@example.invalid");
+  });
+});
