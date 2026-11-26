@@ -53,7 +53,12 @@ export function dayIn(instant: string, timeZone: string) {
   }).format(new Date(instant));
 }
 
-export function caseStudy(work: Initiative, state: RecordsState): CaseLine[] {
+export function caseStudy(
+  work: Initiative,
+  state: RecordsState,
+  /** Observed GA before/after line (release-compare), if any. */
+  resultNote = "",
+): CaseLine[] {
   const project = state.workspace.projects.find((p) => p.id === work.projectId);
   const zone = project?.timezone || "UTC";
   const sources = state.links
@@ -124,6 +129,7 @@ export function caseStudy(work: Initiative, state: RecordsState): CaseLine[] {
       text: work.releasedAt
         ? join([
             `배포 ${dayIn(work.releasedAt, zone)}`,
+            resultNote,
             frictions.length > 0 &&
               `예상 막힘 ${frictions.length}곳 중 실제 발생 ${happened}, 발생 안 함 ${notHappened}, 미확인 ${frictions.length - happened - notHappened}`,
             plans ? `승인된 측정 계획 ${plans}개` : "측정 계획 없음",
