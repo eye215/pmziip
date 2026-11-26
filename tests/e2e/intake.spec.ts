@@ -250,6 +250,8 @@ test("shared sheet (pmzip_inbox): read with the GA sheet link, review, register"
   ).toHaveAttribute("aria-pressed", "true");
   await intake.getByRole("button", { name: "시트에서 새 메일 확인" }).click();
   await expect(intake.getByRole("status").first()).toContainText("3건 · 후보");
+  await expect(intake.getByRole("note")).toContainText("Gmail 라벨 ");
+  await expect(intake.getByRole("note")).toContainText("pmzip_settings");
   expect(tabs.filter((t) => t === "pmzip_inbox").length).toBeGreaterThanOrEqual(
     1,
   );

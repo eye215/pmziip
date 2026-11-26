@@ -8,7 +8,7 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.1.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.2.0' };
 /** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
 var INBOX_LAST_STATUS_ = '';
 var INBOX_MAX_ITEMS = 300;
@@ -31,12 +31,76 @@ function inboxQuery_(label, query, days) {
   return scope + ' newer_than:' + days + 'd';
 }
 
+/**
+ * Settings typed directly in the sheet: tab pmzip_settings, column B.
+ * A value there wins over the Script Property of the same key; an empty
+ * cell means "default". The Slack token is never read from or written to
+ * the sheet (it is link-shared) — it stays in Script Properties.
+ */
+var PMZIP_SETTINGS_TAB = 'pmzip_settings';
+var PMZIP_SETTINGS = [
+  ['INBOX_GMAIL_LABEL', 'Gmail 라벨', 'PMZIP', '가져올 Gmail 라벨. 쉼표로 여러 개 입력. 예: PMZIP, 고객요청'],
+  ['INBOX_GMAIL_QUERY', 'Gmail 검색식 (고급)', '', '채우면 라벨 대신 이 검색식을 씁니다. 예: from:@고객사.com 요청'],
+  ['INBOX_DAYS', '메일 기간(일)', '30', '최근 며칠 메일을 가져올지 (1~365)'],
+  ['INBOX_CALENDAR_DAYS', '캘린더 기간(일)', '14', '0이면 캘린더 수집 끔'],
+  ['SLACK_CHANNELS', 'Slack 채널', '', '쉼표로 여러 개. 봇을 채널에 초대해야 합니다. 토큰은 여기 쓰지 마세요.'],
+];
+
+function pmzipSettingDef_(key) {
+  for (var i = 0; i < PMZIP_SETTINGS.length; i++) if (PMZIP_SETTINGS[i][0] === key) return PMZIP_SETTINGS[i];
+  return null;
+}
+
+function pmzipSettingsRows_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss && ss.getSheetByName(PMZIP_SETTINGS_TAB);
+  return sh ? sh.getDataRange().getValues() : [];
+}
+
+/** Sheet cell (if the row exists) → Script Property → ''. */
+function pmzipSetting_(key) {
+  var def = pmzipSettingDef_(key);
+  var rows = pmzipSettingsRows_();
+  for (var i = 0; def && i < rows.length; i++)
+    if (String(rows[i][0]).trim() === def[1]) return String(rows[i][1] === null ? '' : rows[i][1]).trim();
+  return String(PropertiesService.getScriptProperties().getProperty(key) || '').trim();
+}
+
+/** Creates pmzip_settings (seeded from current values) if it is missing. */
+function pmzipEnsureSettingsSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+  var sh = ss.getSheetByName(PMZIP_SETTINGS_TAB);
+  if (sh && sh.getDataRange().getValues().length > 1) return sh;
+  var rows = [['설정', '값 (여기에 입력)', '설명']].concat(PMZIP_SETTINGS.map(function (d) {
+    return [d[1], pmzipSetting_(d[0]) || d[2], d[3]];
+  }));
+  sh = sh || ss.insertSheet(PMZIP_SETTINGS_TAB);
+  sh.getRange(1, 1, rows.length, 3).setNumberFormat('@').setValues(rows);
+  return sh;
+}
+
+function pmzipSaveSetting_(key, value) {
+  var def = pmzipSettingDef_(key);
+  var sh = pmzipEnsureSettingsSheet_();
+  var rows = sh.getDataRange().getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === def[1]) {
+      sh.getRange(i + 1, 2).setNumberFormat('@').setValue(value);
+      return;
+    }
+  }
+  sh.getRange(rows.length + 1, 1, 1, 3).setNumberFormat('@').setValues([[def[1], value, def[3]]]);
+}
+
 function buildInboxExport_() {
   var props = PropertiesService.getScriptProperties();
-  var label = props.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP';
-  var query = (props.getProperty('INBOX_GMAIL_QUERY') || '').trim();
-  var days = Number(props.getProperty('INBOX_DAYS') || 30);
-  var calDays = Number(props.getProperty('INBOX_CALENDAR_DAYS') || 14);
+  var label = pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var query = pmzipSetting_('INBOX_GMAIL_QUERY');
+  var days = Number(pmzipSetting_('INBOX_DAYS') || 30);
+  var calDays = Number(pmzipSetting_('INBOX_CALENDAR_DAYS') || 14);
+  if (!(days >= 1 && days <= 365)) days = 30;
+  if (!(calDays >= 0)) calDays = 14;
   var items = [];
   var threads = GmailApp.search(inboxQuery_(label, query, days), 0, 100);
   threads.forEach(function (thread) {
@@ -83,7 +147,7 @@ function buildInboxExport_() {
       var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
       items = items.concat(slack.items);
       notes = slack.notes;
-      var on = props.getProperty('SLACK_BOT_TOKEN') && props.getProperty('SLACK_CHANNELS');
+      var on = props.getProperty('SLACK_BOT_TOKEN') && pmzipSetting_('SLACK_CHANNELS');
       slackPart = on ? 'Slack ' + slack.items.length + '건' : 'Slack 미설정(토큰·채널)';
     } catch (e) {
       // Mail and calendar still go out when Slack fails.
@@ -158,6 +222,7 @@ function exportInboxToSheet() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    pmzipEnsureSettingsSheet_(); // so the label can be typed in the sheet next time
     var tab = sheet_(ss, INBOX_TAB);
     writeChunks_(tab, asciiJson_(data), INBOX_CHUNK_HEADER);
     // Column B is not read by PM.zip; it shows when and what was collected.
