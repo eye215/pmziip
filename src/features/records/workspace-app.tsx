@@ -6,7 +6,10 @@ import { MeasurementWorkspace } from "../measurement/workspace";
 import { readiness } from "../measurement/model";
 import { SourceSplitReview } from "../measurement/source-split";
 import { CoachDataPanel } from "../coach-data/panel";
-import { CoachProjectMetrics } from "../coach-data/summary";
+import {
+  CoachCollectionNote,
+  CoachProjectMetrics,
+} from "../coach-data/summary";
 import {
   useRecords,
   useView,
@@ -376,7 +379,12 @@ export function WorkspaceApp() {
                                 w.status !== "archived",
                             ).length
                           }
-                          개 · 데이터 수집은 아직 연결되지 않았습니다.
+                          개 ·{" "}
+                          {project.kind === "coach" ? (
+                            <CoachCollectionNote projectId={project.id} />
+                          ) : (
+                            "데이터 수집은 아직 연결되지 않았습니다."
+                          )}
                         </p>
                         <div className="actions">
                           <button onClick={() => open("project", project.id)}>

@@ -170,7 +170,13 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
     name: "Demo Coach 프로젝트",
     exact: true,
   });
-  await expect(card.locator(".metrics")).toContainText("훈련 완료율75%");
+  await expect(card.locator(".metrics")).toContainText("훈련 완료율 (UU)75%");
+  // REPORT 620 / start count 900
+  await expect(card.locator(".metrics")).toContainText(
+    "훈련 완료율 (횟수)68.9%",
+  );
+  await expect(card).toContainText("GA 기간 2개 가져옴");
+  await expect(card).not.toContainText("데이터 수집은 아직");
   await expect(card.locator(".metrics")).toContainText("평균 평가점수4");
   await expect(card).toContainText("GA 2026-10-01~2026-10-31");
   await expect(
