@@ -7,8 +7,9 @@
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('PM.zip')
-    .addItem('설정 탭 열기 (라벨·기간·채널 직접 입력)', 'pmzipOpenSettings')
-    .addItem('가져올 Gmail 라벨 설정', 'pmzipSetInboxLabels')
+    .addItem('Gmail 라벨 불러와서 체크로 고르기', 'pmzipPickLabels')
+    .addItem('설정 탭 열기 (기간·채널 입력)', 'pmzipOpenSettings')
+    .addItem('가져올 Gmail 라벨 직접 입력', 'pmzipSetInboxLabels')
     .addItem('Gmail 검색식으로 설정 (고급)', 'pmzipSetInboxQuery')
     .addItem('메일 가져올 기간(일) 설정', 'pmzipSetInboxDays')
     .addItem('Slack 채널 설정', 'pmzipSetSlackChannels')
@@ -37,7 +38,8 @@ function pmzipLabelNames_() {
 function pmzipSetInboxLabels() {
   var ui = SpreadsheetApp.getUi();
   var props = pmzipProps_();
-  var current = pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var picked = pmzipCheckedLabels_();
+  var current = (picked && picked.join(', ')) || pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
   var names = pmzipLabelNames_();
   var res = ui.prompt(
     '가져올 Gmail 라벨',
@@ -53,6 +55,7 @@ function pmzipSetInboxLabels() {
   }
   pmzipSaveSetting_('INBOX_GMAIL_LABEL', labels.join(', '));
   pmzipSaveSetting_('INBOX_GMAIL_QUERY', ''); // labels take over from an old search
+  if (pmzipLabelSectionAt_(pmzipSettingsRows_()) >= 0) pmzipRefreshLabelList_(labels); // keep checks in sync
   var missing = names.length ? labels.filter(function (l) { return names.indexOf(l) < 0; }) : [];
   ui.alert(
     '저장했습니다: ' + labels.join(', ') +
@@ -143,6 +146,22 @@ function pmzipInstallInboxTrigger() {
   ui.alert('매일 07시대에 지금 이 계정의 메일을 가져오도록 설정했습니다. 메일을 읽을 계정으로 로그인한 상태에서 눌러야 합니다.');
 }
 
+/** Loads this account's Gmail labels into pmzip_settings as checkboxes. */
+function pmzipPickLabels() {
+  var ui = SpreadsheetApp.getUi();
+  var n = pmzipRefreshLabelList_();
+  if (n < 0) {
+    ui.alert('Gmail 라벨을 읽지 못했습니다. 메일 계정으로 로그인했는지, 권한을 승인했는지 확인해 주세요.');
+    return;
+  }
+  var sh = pmzipEnsureSettingsSheet_();
+  sh.activate();
+  var at = pmzipLabelSectionAt_(sh.getDataRange().getValues());
+  if (at >= 0) sh.getRange(at + 2, 2).activate();
+  ui.alert(n ? '라벨 ' + n + '개를 불러왔습니다. pmzip_settings 탭 "Gmail 라벨 목록"에서 가져올 라벨을 체크한 뒤 ' +
+    '"요구사항 메일 지금 가져오기"를 누르세요.' : '이 계정에 사용자 라벨이 없습니다. Gmail에서 라벨을 먼저 만들어 주세요.');
+}
+
 /** Shows (creating if needed) the pmzip_settings tab where values are typed directly. */
 function pmzipOpenSettings() {
   var sh = pmzipEnsureSettingsSheet_();
@@ -155,7 +174,7 @@ function pmzipShowSettings() {
   var q = pmzipSetting_('INBOX_GMAIL_QUERY');
   SpreadsheetApp.getUi().alert(
     'PM.zip 설정\n\n' +
-      '메일 대상: ' + (q ? '검색식 ' + q : '라벨 ' + (pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP')) + '\n' +
+      '메일 대상: ' + (q ? '검색식 ' + q : '라벨 ' + (((pmzipCheckedLabels_() || []).join(', ')) || pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP')) + '\n' +
       '기간: 최근 ' + (pmzipSetting_('INBOX_DAYS') || '30') + '일\n' +
       '캘린더: 최근 ' + (pmzipSetting_('INBOX_CALENDAR_DAYS') || '14') + '일 (0이면 끔)\n' +
       '공유 시트 기록: ' + (p.getProperty('INBOX_SHEET') === 'on' ? '켜짐' : '꺼짐') + '\n' +
