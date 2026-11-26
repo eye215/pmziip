@@ -50,3 +50,22 @@
   padding: 10px 0;
   overflow-wrap: anywhere;
 }
+.report-public {
+  margin: 8px 0 12px;
+}
+.report-public summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+.report-public textarea {
+  width: 100%;
+  min-height: 180px;
+  font: 13px/1.6 inherit;
+  border: 1px solid #ccd3df;
+  border-radius: 7px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
