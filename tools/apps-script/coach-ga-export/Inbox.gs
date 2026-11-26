@@ -8,7 +8,7 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.1.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.3.0' };
 /** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
 var INBOX_LAST_STATUS_ = '';
 var INBOX_MAX_ITEMS = 300;
@@ -31,12 +31,155 @@ function inboxQuery_(label, query, days) {
   return scope + ' newer_than:' + days + 'd';
 }
 
+/**
+ * Settings typed directly in the sheet: tab pmzip_settings, column B.
+ * A value there wins over the Script Property of the same key; an empty
+ * cell means "default". The Slack token is never read from or written to
+ * the sheet (it is link-shared) — it stays in Script Properties.
+ */
+var PMZIP_SETTINGS_TAB = 'pmzip_settings';
+var PMZIP_SETTINGS = [
+  ['INBOX_GMAIL_LABEL', 'Gmail 라벨', 'PMZIP', '쉼표로 직접 입력. 아래 "Gmail 라벨 목록"에서 체크하면 체크한 라벨이 우선합니다.'],
+  ['INBOX_GMAIL_QUERY', 'Gmail 검색식 (고급)', '', '채우면 라벨 대신 이 검색식을 씁니다. 예: from:@고객사.com 요청'],
+  ['INBOX_DAYS', '메일 기간(일)', '30', '최근 며칠 메일을 가져올지 (1~365)'],
+  ['INBOX_CALENDAR_DAYS', '캘린더 기간(일)', '14', '0이면 캘린더 수집 끔'],
+  ['SLACK_CHANNELS', 'Slack 채널', '', '쉼표로 여러 개. 봇을 채널에 초대해야 합니다. 토큰은 여기 쓰지 마세요.'],
+];
+
+function pmzipSettingDef_(key) {
+  for (var i = 0; i < PMZIP_SETTINGS.length; i++) if (PMZIP_SETTINGS[i][0] === key) return PMZIP_SETTINGS[i];
+  return null;
+}
+
+function pmzipSettingsRows_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss && ss.getSheetByName(PMZIP_SETTINGS_TAB);
+  return sh ? sh.getDataRange().getValues() : [];
+}
+
+/** Sheet cell (if the row exists) → Script Property → ''. */
+function pmzipSetting_(key) {
+  var def = pmzipSettingDef_(key);
+  var rows = pmzipSettingsRows_();
+  for (var i = 0; def && i < rows.length; i++)
+    if (String(rows[i][0]).trim() === def[1]) return String(rows[i][1] === null ? '' : rows[i][1]).trim();
+  return String(PropertiesService.getScriptProperties().getProperty(key) || '').trim();
+}
+
+/** Creates pmzip_settings (seeded from current values) if it is missing. */
+function pmzipEnsureSettingsSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+  var sh = ss.getSheetByName(PMZIP_SETTINGS_TAB);
+  if (sh && sh.getDataRange().getValues().length > 1) return sh;
+  var rows = [['설정', '값 (여기에 입력)', '설명']].concat(PMZIP_SETTINGS.map(function (d) {
+    return [d[1], pmzipSetting_(d[0]) || d[2], d[3]];
+  }));
+  sh = sh || ss.insertSheet(PMZIP_SETTINGS_TAB);
+  sh.getRange(1, 1, rows.length, 3).setNumberFormat('@').setValues(rows);
+  return sh;
+}
+
+function pmzipSaveSetting_(key, value) {
+  var def = pmzipSettingDef_(key);
+  var sh = pmzipEnsureSettingsSheet_();
+  var rows = sh.getDataRange().getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === def[1]) {
+      sh.getRange(i + 1, 2).setNumberFormat('@').setValue(value);
+      return;
+    }
+  }
+  sh.getRange(rows.length + 1, 1, 1, 3).setNumberFormat('@').setValues([[def[1], value, def[3]]]);
+}
+
+/**
+ * Pick labels with checkboxes: section "Gmail 라벨 목록" under the settings,
+ * filled from the running account's Gmail labels (refreshed on every run,
+ * checks kept). Checked labels win over the typed "Gmail 라벨" cell.
+ */
+var PMZIP_LABEL_LIST = 'Gmail 라벨 목록';
+var PMZIP_LABEL_MAX = 300;
+
+function pmzipLabelSectionAt_(rows) {
+  for (var i = 0; i < rows.length; i++) if (String(rows[i][0]).trim() === PMZIP_LABEL_LIST) return i;
+  return -1;
+}
+function pmzipIsChecked_(v) {
+  return v === true || String(v).toLowerCase() === 'true';
+}
+
+/** Checked labels, or null when the list does not exist / nothing is checked. */
+function pmzipCheckedLabels_() {
+  var rows = pmzipSettingsRows_();
+  var at = pmzipLabelSectionAt_(rows);
+  if (at < 0) return null;
+  var out = [];
+  for (var j = at + 1; j < rows.length; j++) {
+    var name = String(rows[j][0]).trim();
+    if (name && pmzipIsChecked_(rows[j][1])) out.push(name);
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * Writes the account's labels as checkbox rows. Checks are kept by name;
+ * `checkOnly` (array) replaces them. Returns the number of labels, or -1
+ * when Gmail labels cannot be read.
+ */
+function pmzipRefreshLabelList_(checkOnly) {
+  var names;
+  try {
+    names = GmailApp.getUserLabels().map(function (l) { return l.getName(); });
+  } catch (e) {
+    return -1;
+  }
+  names.sort();
+  names = names.slice(0, PMZIP_LABEL_MAX);
+  var sh = pmzipEnsureSettingsSheet_();
+  if (!sh) return -1;
+  var rows = sh.getDataRange().getValues();
+  var at = pmzipLabelSectionAt_(rows);
+  var checked = {};
+  var keep = checkOnly;
+  if (!keep) {
+    if (at >= 0) {
+      keep = [];
+      for (var j = at + 1; j < rows.length; j++)
+        if (pmzipIsChecked_(rows[j][1])) keep.push(String(rows[j][0]).trim());
+    } else {
+      keep = String(pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP').split(',');
+    }
+  }
+  keep.forEach(function (n) { checked[String(n).trim()] = true; });
+  var head = at >= 0 ? at + 1 : rows.length + 2; // 1-based row of the section title
+  var old = at >= 0 ? rows.length - head : 0;
+  if (old > 0) {
+    var stale = sh.getRange(head + 1, 1, old, 3);
+    stale.clearDataValidations();
+    stale.clearContent();
+  }
+  sh.getRange(head, 1, 1, 3).setValues([[PMZIP_LABEL_LIST, '가져오기 (체크)',
+    '체크한 라벨의 메일만 가져옵니다. 목록은 수집할 때마다 실행한 계정의 라벨로 갱신됩니다.']]);
+  if (names.length) {
+    sh.getRange(head + 1, 1, names.length, 1).setNumberFormat('@')
+      .setValues(names.map(function (n) { return [n]; }));
+    var boxes = sh.getRange(head + 1, 2, names.length, 1);
+    boxes.insertCheckboxes();
+    boxes.setValues(names.map(function (n) { return [!!checked[n]]; }));
+  }
+  return names.length;
+}
+
 function buildInboxExport_() {
   var props = PropertiesService.getScriptProperties();
-  var label = props.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP';
-  var query = (props.getProperty('INBOX_GMAIL_QUERY') || '').trim();
-  var days = Number(props.getProperty('INBOX_DAYS') || 30);
-  var calDays = Number(props.getProperty('INBOX_CALENDAR_DAYS') || 14);
+  var picked = pmzipCheckedLabels_();
+  var label = (picked && picked.join(', ')) || pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var query = pmzipSetting_('INBOX_GMAIL_QUERY');
+  var days = Number(pmzipSetting_('INBOX_DAYS') || 30);
+  var calDays = Number(pmzipSetting_('INBOX_CALENDAR_DAYS') || 14);
+  if (!(days >= 1 && days <= 365)) days = 30;
+  if (!(calDays >= 0)) calDays = 14;
   var items = [];
   var threads = GmailApp.search(inboxQuery_(label, query, days), 0, 100);
   threads.forEach(function (thread) {
@@ -83,7 +226,7 @@ function buildInboxExport_() {
       var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
       items = items.concat(slack.items);
       notes = slack.notes;
-      var on = props.getProperty('SLACK_BOT_TOKEN') && props.getProperty('SLACK_CHANNELS');
+      var on = props.getProperty('SLACK_BOT_TOKEN') && pmzipSetting_('SLACK_CHANNELS');
       slackPart = on ? 'Slack ' + slack.items.length + '건' : 'Slack 미설정(토큰·채널)';
     } catch (e) {
       // Mail and calendar still go out when Slack fails.
@@ -147,6 +290,7 @@ function inboxClean_(text) {
 function exportInboxToSheet() {
   if (PropertiesService.getScriptProperties().getProperty('INBOX_SHEET') !== 'on')
     throw new Error('스크립트 속성 INBOX_SHEET=on 을 설정한 뒤 실행해 주세요 (공유 시트에 메일 내용이 기록됩니다).');
+  pmzipRefreshLabelList_(); // this account's labels as checkboxes, checks kept
   var data = buildInboxExport_();
   data.items.forEach(function (it) {
     it.title = inboxClean_(it.title).slice(0, 300);
@@ -158,6 +302,7 @@ function exportInboxToSheet() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    pmzipEnsureSettingsSheet_(); // so the label can be typed in the sheet next time
     var tab = sheet_(ss, INBOX_TAB);
     writeChunks_(tab, asciiJson_(data), INBOX_CHUNK_HEADER);
     // Column B is not read by PM.zip; it shows when and what was collected.

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { fakeSpreadsheet } from "./fake-spreadsheet";
 import { describe, expect, it } from "vitest";
 import { inboxExportSchema } from "../../src/lib/connectors/inbox-export";
 import { extractCandidates } from "../../src/lib/connectors/requirement-extract";
@@ -65,22 +66,8 @@ function slack(url: string) {
 }
 function world(props: Record<string, string>) {
   const calls: { url: string; auth: string }[] = [];
-  const sheets = new Map<string, string[][]>();
-  const sheet = (name: string) => ({
-    clearContents: () => sheets.set(name, []),
-    getRange: () => {
-      const r = {
-        setNumberFormat: () => r,
-        setValue: (v: string) => void sheets.set(name + "!B1", [[String(v)]]),
-        setValues: (rows: string[][]) =>
-          void sheets.set(
-            name,
-            rows.map((x) => x.map(String)),
-          ),
-      };
-      return r;
-    },
-  });
+  const fake = fakeSpreadsheet();
+  const sheets = fake.grids;
   const ctx: Record<string, unknown> = {
     PropertiesService: {
       getScriptProperties: () => ({
@@ -113,10 +100,7 @@ function world(props: Record<string, string>) {
     Session: { getScriptTimeZone: () => "Asia/Seoul" },
     Logger: { log: () => {} },
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({
-        getSheetByName: sheet,
-        insertSheet: sheet,
-      }),
+      getActiveSpreadsheet: () => fake.ss,
     },
     LockService: {
       getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }),
@@ -194,8 +178,8 @@ describe("Slack.gs intake", () => {
     expect(status).toBe(
       "Gmail 0건 (라벨 PMZIP, 최근 30일) · 캘린더 끔 · Slack 1건 — Slack 채널을 찾지 못했거나 봇이 초대되지 않았습니다: unknown-channel",
     );
-    expect(w.sheets.get("pmzip_inbox!B1")![0][0]).toContain(status);
-    expect(w.sheets.get("pmzip_inbox!B1")![0][0]).not.toContain(TOKEN);
+    expect(w.sheets.get("pmzip_inbox")![0][1]).toContain(status);
+    expect(w.sheets.get("pmzip_inbox")![0][1]).not.toContain(TOKEN);
 
     const bad = world({
       SLACK_BOT_TOKEN: TOKEN,

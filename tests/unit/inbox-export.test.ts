@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { fakeSpreadsheet } from "./fake-spreadsheet";
 import { describe, expect, it } from "vitest";
 import {
   inboxExportSchema,
@@ -25,6 +26,7 @@ function run() {
   const searches: string[] = [];
   const ctx: Record<string, unknown> = {
     Logger: { log: () => {} },
+    SpreadsheetApp: { getActiveSpreadsheet: () => null },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k: string) => ({ INBOX_GMAIL_LABEL: "PMZIP" })[k] ?? null,
@@ -119,22 +121,8 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
     const { joinSheetChunks, parseCsv } =
       await import("../../src/lib/connectors/sheet-source");
     const { sha256 } = await import("../../src/features/coach-data/store");
-    const sheets = new Map<string, string[][]>();
-    const sheet = (name: string) => ({
-      clearContents: () => sheets.set(name, []),
-      getRange: () => {
-        const r = {
-          setNumberFormat: () => r,
-          setValue: (v: string) => void sheets.set(name + "!B1", [[String(v)]]),
-          setValues: (rows: string[][]) =>
-            void sheets.set(
-              name,
-              rows.map((x) => x.map(String)),
-            ),
-        };
-        return r;
-      },
-    });
+    const fake = fakeSpreadsheet();
+    const sheets = fake.grids;
     const ctx: Record<string, unknown> = {
       Logger: { log: () => {} },
       PropertiesService: {
@@ -174,10 +162,7 @@ describe("Inbox.gs shared-sheet path (opt-in) reduces what is exposed", () => {
       },
       Session: { getScriptTimeZone: () => "Asia/Seoul" },
       SpreadsheetApp: {
-        getActiveSpreadsheet: () => ({
-          getSheetByName: sheet,
-          insertSheet: sheet,
-        }),
+        getActiveSpreadsheet: () => fake.ss,
       },
       LockService: {
         getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }),
@@ -258,7 +243,9 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
   function load(
     props: Record<string, string>,
     extra: Record<string, unknown> = {},
+    tabs: Record<string, string[][]> = {},
   ) {
+    const fake = fakeSpreadsheet(tabs);
     const searches: string[] = [];
     const store = { ...props };
     const alerts: string[] = [];
@@ -297,7 +284,7 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
       CalendarApp: {
         getDefaultCalendar: () => ({ getId: () => "c", getEvents: () => [] }),
       },
-      SpreadsheetApp: { getUi: () => ui },
+      SpreadsheetApp: { getUi: () => ui, getActiveSpreadsheet: () => fake.ss },
       ...extra,
     };
     vm.createContext(ctx);
@@ -308,6 +295,7 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
       );
     return {
       ctx,
+      fake,
       searches,
       store,
       alerts,
@@ -334,20 +322,122 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
     expect(b.searches).toEqual(["(from:@example.invalid 요청) newer_than:60d"]);
     expect(file.query.gmailLabel).toBe("query: from:@example.invalid 요청");
   });
-  it("menu saves labels (clearing an old query), warns on unknown labels, validates days", () => {
+  const setting = (
+    m: { fake: { grids: Map<string, string[][]> } },
+    label: string,
+  ) => m.fake.grids.get("pmzip_settings")?.find((r) => r[0] === label)?.[1];
+  it("menu saves labels to the settings tab (clearing an old query), warns on unknown labels, validates days", () => {
     const m = load({ INBOX_GMAIL_QUERY: "old" });
     m.answer(" PMZIP , 없는라벨 ");
     vm.runInContext("pmzipSetInboxLabels()", m.ctx);
-    expect(m.store.INBOX_GMAIL_LABEL).toBe("PMZIP, 없는라벨");
-    expect(m.store.INBOX_GMAIL_QUERY).toBeUndefined();
+    expect(setting(m, "Gmail 라벨")).toBe("PMZIP, 없는라벨");
+    expect(setting(m, "Gmail 검색식 (고급)")).toBe("");
     expect(m.alerts.at(-1)).toContain(
       "이 계정에 없는 라벨이 있습니다 — 없는라벨",
     );
     m.answer("999");
     vm.runInContext("pmzipSetInboxDays()", m.ctx);
-    expect(m.store.INBOX_DAYS).toBeUndefined();
+    expect(setting(m, "메일 기간(일)")).toBe("30");
     m.answer("45");
     vm.runInContext("pmzipSetInboxDays()", m.ctx);
-    expect(m.store.INBOX_DAYS).toBe("45");
+    expect(setting(m, "메일 기간(일)")).toBe("45");
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches.at(-1)).toBe(
+      '(label:"PMZIP" OR label:"없는라벨") newer_than:45d',
+    );
+  });
+  it("loads this account's labels as checkboxes; checked labels are used and kept", () => {
+    let labels = ["PMZIP", "고객요청", "운영/이슈"];
+    const m = load(
+      { INBOX_GMAIL_LABEL: "고객요청", INBOX_CALENDAR_DAYS: "0" },
+      {},
+    );
+    (m.ctx.GmailApp as { getUserLabels: unknown }).getUserLabels = () =>
+      labels.map((n) => ({ getName: () => n }));
+    const dialogs: string[] = [];
+    m.ctx.HtmlService = {
+      createHtmlOutput: (h: string) => {
+        dialogs.push(h);
+        const o = { setWidth: () => o, setHeight: () => o };
+        return o;
+      },
+    };
+    (
+      m.ctx.SpreadsheetApp as { getUi: () => Record<string, unknown> }
+    ).getUi().showModalDialog = () => {};
+    labels = [...labels, "</script><b>x"];
+    vm.runInContext("pmzipPickLabels()", m.ctx);
+    // Dialog lists every label (multi-select), current ones pre-checked, safely embedded.
+    expect(dialogs[0]).toContain('"current":["고객요청"]');
+    expect(dialogs[0]).toContain("운영/이슈");
+    expect(dialogs[0]).not.toContain("</script><b>");
+    expect(dialogs[0]).toContain("\\u003c/script>\\u003cb>x");
+    // Unknown names are dropped; picked labels saved and synced to the sheet list.
+    labels = ["PMZIP", "고객요청", "운영/이슈"];
+    const msg = vm.runInContext(
+      'pmzipSaveLabelPick(["고객요청", "없는라벨", "고객요청"], false)',
+      m.ctx,
+    );
+    expect(msg).toBe("저장했습니다: 고객요청");
+    expect(() =>
+      vm.runInContext("pmzipSaveLabelPick([], false)", m.ctx),
+    ).toThrow("하나 이상");
+    const grid = () => m.fake.grids.get("pmzip_settings")!;
+    const list = () => {
+      const at = grid().findIndex((r) => r[0] === "Gmail 라벨 목록");
+      return grid()
+        .slice(at + 1)
+        .filter((r) => r[0])
+        .map((r) => [r[0], r[1]]);
+    };
+    expect(list()).toEqual([
+      ["PMZIP", "false"],
+      ["고객요청", "true"],
+      ["운영/이슈", "false"],
+    ]);
+    // The user ticks one more box in the sheet.
+    const row = grid().findIndex((r) => r[0] === "운영/이슈");
+    grid()[row][1] = "TRUE";
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches.at(-1)).toBe(
+      '(label:"고객요청" OR label:"운영/이슈") newer_than:30d',
+    );
+    // Refresh with a removed label: checks kept by name, stale rows cleared.
+    labels = ["고객요청", "운영/이슈"];
+    vm.runInContext("pmzipRefreshLabelList_()", m.ctx);
+    expect(list()).toEqual([
+      ["고객요청", "true"],
+      ["운영/이슈", "true"],
+    ]);
+    // Nothing checked → falls back to the typed cell.
+    for (const r of grid()) if (r[1] === "true") r[1] = "false";
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches.at(-1)).toBe('(label:"고객요청") newer_than:30d');
+  });
+  it("labels typed directly in the pmzip_settings tab win over Script Properties", () => {
+    const m = load(
+      { INBOX_GMAIL_LABEL: "PMZIP", INBOX_CALENDAR_DAYS: "0" },
+      {},
+      {
+        pmzip_settings: [
+          ["설정", "값 (여기에 입력)", "설명"],
+          ["Gmail 라벨", " 고객요청, 운영이슈 ", ""],
+          ["메일 기간(일)", "", ""],
+        ],
+      },
+    );
+    vm.runInContext("buildInboxExport_()", m.ctx);
+    expect(m.searches).toEqual([
+      '(label:"고객요청" OR label:"운영이슈") newer_than:30d',
+    ]);
+    // Menu "설정 탭 열기" creates the tab from current values when missing.
+    const n = load({ INBOX_GMAIL_LABEL: "PMZIP, 고객요청" });
+    vm.runInContext("pmzipOpenSettings()", n.ctx);
+    expect(n.fake.active()).toBe("pmzip_settings");
+    expect(setting(n, "Gmail 라벨")).toBe("PMZIP, 고객요청");
+    expect(setting(n, "캘린더 기간(일)")).toBe("14");
+    expect(n.fake.grids.get("pmzip_settings")!.flat().join(" ")).not.toMatch(
+      /xox|TOKEN/i,
+    );
   });
 });
