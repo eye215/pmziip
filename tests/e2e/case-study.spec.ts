@@ -80,6 +80,10 @@ test("case study fields save on the initiative and show as eight lines", async (
   const card = page
     .getByRole("article")
     .filter({ hasText: "합성 다시하기 개선" });
+  // Flow bar: collected? no source linked; decided, changed, released yes.
+  await expect(
+    card.getByRole("list", { name: "진행 단계: 배포" }),
+  ).toBeVisible();
   await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
   const lines = card.locator(".case-lines li");
   await expect(lines).toHaveCount(8);
@@ -169,6 +173,10 @@ test("released Coach initiative shows GA before/after as observations", async ({
     .getByRole("article")
     .filter({ hasText: "합성 완료 흐름 개선" });
   await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
+  // With an observed change the last stage (성과) is reached.
+  await expect(
+    card.getByRole("list", { name: "진행 단계: 성과" }),
+  ).toBeVisible();
   const table = card.getByRole("table");
   await expect(table).toContainText("배포 전후 7일");
   await expect(table.getByRole("row", { name: /횟수 완료율/ })).toContainText(
@@ -183,4 +191,25 @@ test("released Coach initiative shows GA before/after as observations", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("home shows this month's flow as observations", async ({ page }) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Demo Coach", exact: true }),
+  ).toBeVisible();
+  await tab(page, "과제");
+  await page.getByRole("button", { name: "과제 추가", exact: true }).click();
+  await page.getByLabel("과제 프로젝트", { exact: true }).selectOption(COACH);
+  await page.getByLabel("과제 제목", { exact: true }).fill("합성 홈 흐름 과제");
+  await page.getByLabel("업무 상태", { exact: true }).selectOption("released");
+  await page.getByLabel("배포 일시", { exact: true }).fill("2026-11-18T10:00");
+  await page
+    .getByRole("button", { name: "확인하고 저장", exact: true })
+    .click();
+  await expect(page.locator(".editor")).toHaveCount(0);
+  await tab(page, "홈");
+  const flow = page.getByRole("region", { name: /2026-11 흐름/ });
+  await expect(flow).toContainText("배포 1건");
+  await expect(flow.locator("dd").nth(3)).toHaveText("1");
 });

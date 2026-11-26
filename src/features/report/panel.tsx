@@ -19,7 +19,7 @@ import {
 } from "./model";
 import "./report.css";
 
-function observeFor(state: RecordsState) {
+export function observeFor(state: RecordsState) {
   return (w: Initiative): Observed => {
     const project = state.workspace.projects.find((p) => p.id === w.projectId);
     if (!w.releasedAt || project?.kind !== "coach")
