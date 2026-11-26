@@ -1,0 +1,52 @@
+.report-panel {
+  margin-bottom: 24px;
+}
+.report-panel h3 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.report-summary > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.report-summary dt {
+  font-size: 11px;
+}
+.report-summary dd {
+  font-size: 17px;
+  margin-top: 2px;
+  color: var(--ink);
+}
+.report-case ol,
+.report-saved ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.report-case li,
+.report-saved li {
+  overflow-wrap: anywhere;
+}
+.report-panel .report-case li strong,
+.report-panel .report-saved li strong {
+  display: inline;
+  width: auto;
+  color: var(--ink);
+}
+.report-case summary,
+.report-saved summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
