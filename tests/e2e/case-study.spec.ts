@@ -27,7 +27,7 @@ test("case study fields save on the initiative and show as eight lines", async (
   await expect(
     page.getByRole("heading", { name: "Demo Coach", exact: true }),
   ).toBeVisible();
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await page.getByRole("button", { name: "과제 추가", exact: true }).click();
   await page.getByLabel("과제 프로젝트", { exact: true }).selectOption(COACH);
   await page
@@ -151,7 +151,7 @@ test("released Coach initiative shows GA before/after as observations", async ({
   await expect(
     page.getByRole("heading", { name: "Demo Coach", exact: true }),
   ).toBeVisible();
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await page.getByRole("button", { name: "과제 추가", exact: true }).click();
   await page.getByLabel("과제 프로젝트", { exact: true }).selectOption(COACH);
   await page

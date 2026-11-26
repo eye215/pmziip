@@ -193,7 +193,7 @@ export function ReportPanel({ state }: { state: RecordsState }) {
           <h3>미리보기 (확정 전)</h3>
           <ReportBody r={draft} />
           <div className="actions">
-            <button type="button" className="primary" onClick={finalize}>
+            <button type="button" className="primary commit" onClick={finalize}>
               이 내용으로 확정
             </button>
             <CopyButton text={reportText(draft)} />

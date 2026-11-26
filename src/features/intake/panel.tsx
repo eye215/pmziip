@@ -409,7 +409,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
             </p>
           ) : sheetId ? null : (
             <p className="empty-state">
-              먼저 백업·가져오기에서 GA 시트를 연결해 주세요.
+              먼저 설정에서 GA 시트를 연결해 주세요.
             </p>
           )}
         </>

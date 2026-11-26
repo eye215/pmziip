@@ -24,7 +24,7 @@ test("impact report: period draft, finalize once as a snapshot, survives reload"
   await expect(
     page.getByRole("heading", { name: "Demo Coach", exact: true }),
   ).toBeVisible();
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await page.getByRole("button", { name: "과제 추가", exact: true }).click();
   await page.getByLabel("과제 프로젝트", { exact: true }).selectOption(COACH);
   await page.getByLabel("과제 제목", { exact: true }).fill("합성 보고서 과제");

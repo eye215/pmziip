@@ -373,7 +373,7 @@ test("source split is a review-only proposal until explicit project mapping and 
   await boot(page);
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "통합 수집함", exact: true })
+    .getByRole("button", { name: "수집함", exact: true })
     .click();
   await page
     .getByRole("button", { name: "분리 초안 검토", exact: true })
@@ -428,7 +428,7 @@ test("v1 backup write failure and cancelled navigation keep both old bytes and c
   page.once("dialog", (d) => d.dismiss());
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "프로젝트", exact: true })
+    .getByRole("button", { name: "홈", exact: true })
     .click();
   await expect(page.getByLabel("지표 이름", { exact: true })).toHaveValue(
     "보존할 초안",

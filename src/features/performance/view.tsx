@@ -615,7 +615,7 @@ function MarketSection({ projects }: { projects: ProjectOption[] }) {
   );
 }
 
-/** "성과" tab: view only. Connecting and syncing live in 백업·가져오기. */
+/** "성과" tab: view only. Connecting and syncing live in 설정 (data tab). */
 export function PerformanceView({ projects }: { projects: ProjectOption[] }) {
   return (
     <div className="perf">

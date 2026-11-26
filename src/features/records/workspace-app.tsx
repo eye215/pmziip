@@ -258,11 +258,11 @@ export function WorkspaceApp() {
             )}
             <nav className="workspace-nav" aria-label="워크스페이스 메뉴">
               {[
-                ["projects", "프로젝트"],
+                ["projects", "홈"],
+                ["inbox", "수집함"],
+                ["work", "과제"],
                 ["perf", "성과"],
-                ["inbox", "통합 수집함"],
-                ["work", "개선 과제"],
-                ["data", "백업·가져오기"],
+                ["data", "설정"],
               ].map(([id, label]) => (
                 <button
                   key={id}
@@ -518,13 +518,13 @@ export function WorkspaceApp() {
                   <section className="panel">
                     <h2>기록을 시작해 보세요</h2>
                     <p>
-                      통합 수집함의 원문 하나를 여러 프로젝트의 과제로 나눠
-                      연결할 수 있습니다.
+                      수집함의 원문 하나를 여러 프로젝트의 과제로 나눠 연결할 수
+                      있습니다.
                     </p>
                     <button
                       onClick={() => navigate({ tab: "inbox", scope: "all" })}
                     >
-                      통합 수집함 열기
+                      수집함 열기
                     </button>
                   </section>
                 </div>
@@ -534,7 +534,7 @@ export function WorkspaceApp() {
             {tab === "inbox" && (
               <section className="panel">
                 <div className="section-heading">
-                  <h2>통합 수집함</h2>
+                  <h2>수집함</h2>
                   <button className="primary" onClick={() => open("source")}>
                     원문 등록
                   </button>
@@ -630,7 +630,7 @@ export function WorkspaceApp() {
             {tab === "work" && (
               <section className="panel">
                 <div className="section-heading">
-                  <h2>개선 과제</h2>
+                  <h2>과제</h2>
                   <button
                     className="primary"
                     onClick={() => open("initiative")}
@@ -819,7 +819,7 @@ export function WorkspaceApp() {
             )}
             {tab === "data" && (
               <section className="panel">
-                <h2>백업·가져오기</h2>
+                <h2>기록 백업</h2>
                 <p>
                   현재 브라우저 기록 전체를 JSON으로 백업합니다. 새 버전 백업의
                   복원 기능은 후속 단계이며, 현재는 이전 로컬 프로토타입의 배열
