@@ -408,3 +408,48 @@ details p {
     scroll-margin-bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
+
+/* Case study (portfolio) */
+.case-study .case-lines {
+  margin: 8px 0;
+  padding-left: 1.4em;
+  display: grid;
+  gap: 6px;
+}
+.case-study .case-lines li {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.panel .case-study ol.case-lines {
+  list-style: decimal;
+  margin: 8px 0;
+  padding-left: 1.4em;
+}
+.panel .case-study .case-lines li strong {
+  display: inline;
+  width: auto;
+  margin-right: 4px;
+}
+.case-study .case-missing span {
+  color: var(--muted);
+}
+.case-fields,
+.friction-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  min-width: 0;
+}
+.friction-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+@media (max-width: 480px) {
+  .friction-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
