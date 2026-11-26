@@ -1,10 +1,10 @@
 # 개발 진행 현황
 
-기준일: 2026-11-25 · 대상: eye215/pmziip · 최신 브랜치: feat/p2-measurement-plans
+기준일: 2026-11-26 · 대상: eye215/pmziip · 최신 브랜치: preview/development (= main)
 
 ## 현재 범위
 
-**Phase 2 합성 로컬 기능까지 구현. 미병합·미배포.** 최신 상태는 아래 Phase 2 기록을 따른다. 실제 인증·AI·GA·DB와 운영 인수는 미완료다.
+**Phase 0~2와 Phase 3 데이터 연결 일부를 `main`과 개발 미리보기(https://eye215.github.io/pmziip/)에 반영했다.** 최신 상태는 아래 Phase 3 기록을 따른다. 실제 로그인·DB·AI와 GA4 서버 직접 연동, 운영 인수는 미완료다.
 
 아래 Phase 0 검증 기록은 기반 인수 당시의 증거이며 후속 Phase의 제품 기능·운영 인수 상태와 구분한다.
 
@@ -40,3 +40,24 @@ Phase 0 시점의 F01~F44 제품 인수 상태는 모두 계획됨이었다. 최
 ## Phase 2 진행 (2026-11-25)
 
 `feat/p2-measurement-plans`에서 지표 사전/승인 버전·복수 KPI 계획·월별 전략·준비 체크·요청서·검토 후 원문 분리를 구현했다. 규칙 추천과 mock provider만 있으며 실제 AI는 연결하지 않았다. v1 저장은 최초 쓰기 전 정확한 원본 문자열을 보존한다. 단위 40개와 lint/typecheck/build를 통과했다. 최종 브라우저·CI 증거, 모바일 캡처, 미완료 항목은 [Phase 2 인수 기록](PHASE2.md)과 해당 PR Checks를 따른다. Claude의 기존 기록 편집 UI 담당 파일은 변경하지 않았다. 병합·배포·운영 연결은 수행하지 않는다.
+
+## Phase 3 데이터 연결 (2026-11-26)
+
+PR #5~#17로 `preview/development`에 병합·배포했고 `main`에도 반영했다. 실제 데이터 흐름은 다음과 같다.
+
+```
+새 스프레드시트 + 새 Apps Script (회사 계정, 매일 06시대 dailyExport)
+  ├ Code.gs        GA4 Data API 읽기 전용 → pmzip_export / pmzip_summary
+  ├ Dart.gs        OpenDART 단일회사 주요계정(여러 회사) → pmzip_dart / pmzip_dart_summary
+  └ StatCounter.gs 국가별 모바일 제조사 점유율(나눠 받기·이어받기) → pmzip_statcounter(_summary, _cache)
+링크 보기 공유 → PM.zip이 gviz CSV를 읽기 전용으로 동기화(조각 수·SHA-256 검증, 정의 검증, 중복 제외, 실패 시 미기록)
+```
+
+- 화면: **성과** 탭(Coach 요약 타일·월별 추이·전체 지표, 공시 쉽게 보기·분기 매출, 국가별 점유율)과 **백업·가져오기**(연결·동기화·다른 기기 연결 링크)로 나눴다. Coach 프로젝트 카드에 완료율(UU·횟수)과 평균 점수를 표시한다.
+- 쉽게 보기는 규칙 기반(`easy-fin-1`) 문장이며 AI를 쓰지 않는다. 숫자는 모두 코드로 계산한다.
+- 저장은 브라우저별이다. GA·공시·점유율은 같은 시트를 각 기기에서 연결해 동기화하고, 과제·원문은 기기 간 공유되지 않는다.
+- 검증(마지막 병합 기준): 단위 72, 결합 e2e 69(Chromium desktop, WebKit 375·320), 정적 배포 검사 3. Apps Script는 실제 코드를 가짜 GA·DART·StatCounter·Sheets 응답으로 실행해 계약을 검증했다.
+- 실제 환경: 사용자 회사 계정에서 세 수집과 PM.zip 동기화를 실행했다. 기존 보고서와 수치 대조, 실제 iPhone Safari 확인은 미기록이다.
+- 결정 기록: [ADR 0002](adr/0002-apps-script-export-bridge.md), 설정 방법: [COACH_GA_EXPORT.md](COACH_GA_EXPORT.md).
+
+남은 일: 로그인·DB(기기 간 기록 공유), Business Impact 비교·통계(F39), Gmail·Slack·Teams 수집, AI 해석, GA4 서버 직접 연동(MFA·권한 확보 후).
