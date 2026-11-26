@@ -11,8 +11,10 @@ export const PUBLIC_FIN_CHUNK_HEADER = "pmzip.public-financials.chunks";
 export const accounts = ["revenue", "operatingIncome", "netIncome"] as const;
 export type Account = (typeof accounts)[number];
 
+const corpCode = z.string().regex(/^\d{8}$/);
 const rowSchema = z
   .object({
+    corpCode,
     year: z.number().int().min(2000).max(2100),
     quarter: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
     fsDiv: z.enum(["CFS", "OFS"]),
@@ -33,7 +35,10 @@ export const publicFinSchema = z
     format: z.literal(PUBLIC_FIN_FORMAT),
     formatVersion: z.literal(1),
     source: z.literal("dart-opendart-fnlttSinglAcnt"),
-    corpCode: z.string().regex(/^\d{8}$/),
+    companies: z
+      .array(z.object({ corpCode, corpName: z.string().max(200) }).strict())
+      .min(1)
+      .max(20),
     generatedAt: z.iso.datetime({ offset: true }),
     generator: z
       .object({ name: z.string().max(100), version: z.string().max(40) })
@@ -45,8 +50,21 @@ export const publicFinSchema = z
   .strict()
   .superRefine((f, ctx) => {
     const seen = new Set<string>();
+    const corps = new Set(f.companies.map((c) => c.corpCode));
+    if (corps.size !== f.companies.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["companies"],
+        message: "같은 회사가 중복됩니다.",
+      });
     for (const r of f.rows) {
-      const k = `${r.year}|${r.quarter}|${r.fsDiv}|${r.account}`;
+      if (!corps.has(r.corpCode))
+        ctx.addIssue({
+          code: "custom",
+          path: ["rows"],
+          message: `회사 목록에 없는 고유번호입니다: ${r.corpCode}`,
+        });
+      const k = `${r.corpCode}|${r.year}|${r.quarter}|${r.fsDiv}|${r.account}`;
       if (seen.has(k))
         ctx.addIssue({
           code: "custom",
@@ -84,10 +102,12 @@ export type QuarterRow = {
 export function quarterTable(
   rows: FinRow[],
   fsDiv: "CFS" | "OFS",
+  corpCode?: string,
 ): QuarterRow[] {
   const byKey = new Map<string, FinRow[]>();
   for (const r of rows) {
     if (r.fsDiv !== fsDiv) continue;
+    if (corpCode !== undefined && r.corpCode !== corpCode) continue;
     const k = `${r.year}-Q${r.quarter}`;
     byKey.set(k, [...(byKey.get(k) || []), r]);
   }

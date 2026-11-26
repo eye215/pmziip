@@ -57,11 +57,11 @@ export function loadFin(storage: Storage, session: CoachSession): LoadedFin {
 /** Content hash ignores generatedAt/generator so daily re-runs are not new data. */
 export function finContent(file: PublicFinFile) {
   return JSON.stringify({
-    corpCode: file.corpCode,
+    companies: file.companies,
     notes: file.notes,
     rows: [...file.rows].sort((a, b) =>
-      `${a.year}${a.quarter}${a.fsDiv}${a.account}`.localeCompare(
-        `${b.year}${b.quarter}${b.fsDiv}${b.account}`,
+      `${a.corpCode}${a.year}${a.quarter}${a.fsDiv}${a.account}`.localeCompare(
+        `${b.corpCode}${b.year}${b.quarter}${b.fsDiv}${b.account}`,
       ),
     ),
   });

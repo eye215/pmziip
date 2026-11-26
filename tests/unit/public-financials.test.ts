@@ -12,6 +12,7 @@ import {
   parseCsv,
 } from "../../src/lib/connectors/sheet-source";
 import { sha256 } from "../../src/features/coach-data/store";
+import { explainQuarters } from "../../src/lib/connectors/easy-explain";
 import {
   commitFin,
   finContent,
@@ -148,6 +149,15 @@ function sandbox(fetchImpl: (url: string) => { code: number; body: unknown }) {
 }
 const okDart = (url: string) => {
   const u = new URL(url);
+  if (u.pathname.endsWith("company.json"))
+    return {
+      code: 200,
+      body: {
+        status: "000",
+        corp_name:
+          u.searchParams.get("corp_code") === CORP ? "합성전자" : "합성에듀",
+      },
+    };
   return {
     code: 200,
     body: dart(
@@ -161,7 +171,7 @@ describe("Dart.gs exporter ↔ PM.zip contract", () => {
   it("exports reported Q1–Q3, derived Q4, null for missing, never the API key", async () => {
     const { ctx, sheets, urls } = sandbox(okDart);
     vm.runInContext("exportDartToSheet()", ctx);
-    expect(urls).toHaveLength(12); // 3 years × 4 reports
+    expect(urls).toHaveLength(13); // company info + 3 years × 4 reports
     const rows = sheets.get("pmzip_dart")!;
     const csv = rows.map((r) => `"${r[0].replaceAll('"', '""')}"`).join("\n");
     const text = await joinSheetChunks(
@@ -188,7 +198,10 @@ describe("Dart.gs exporter ↔ PM.zip contract", () => {
     expect(file.rows.some((r) => r.accountName === "매출원가")).toBe(false);
     // OFS Q4 has no annual row in the synthetic data → absent, not invented.
     expect(find(2025, 4, "revenue", "OFS")).toBeUndefined();
-    expect(sheets.get("pmzip_dart_summary")![0][0]).toBe("연도");
+    expect(sheets.get("pmzip_dart_summary")![0].slice(0, 2)).toEqual([
+      "회사",
+      "연도",
+    ]);
   });
   it("fails loudly on DART errors instead of writing partial data", () => {
     const { ctx, sheets } = sandbox(() => ({
@@ -250,6 +263,74 @@ describe("quarter table", () => {
     expect(
       commitFin(storage, loadFin(storage, s), rerun, hash2, s, rt),
     ).toBeNull();
-    expect(latestFin(loadFin(storage, s).state)?.file.corpCode).toBe(CORP);
+    expect(
+      latestFin(loadFin(storage, s).state)?.file.companies[0].corpCode,
+    ).toBe(CORP);
+  });
+});
+
+describe("multiple companies", () => {
+  it("exports each corp code with its name and keeps rows separate", () => {
+    const { ctx } = sandbox(okDart);
+    vm.runInContext(
+      `PropertiesService.getScriptProperties = function () { return { getProperty: function (k) { return { DART_API_KEY: '${KEY}', DART_CORP_CODE: '${CORP}, 99999998' }[k] || null; } }; };`,
+      ctx,
+    );
+    const file = publicFinSchema.parse(
+      JSON.parse(JSON.stringify(vm.runInContext("buildDartExport_()", ctx))),
+    );
+    expect(file.companies).toEqual([
+      { corpCode: CORP, corpName: "합성전자" },
+      { corpCode: "99999998", corpName: "합성에듀" },
+    ]);
+    expect(quarterTable(file.rows, "CFS", "99999998")[0].key).toBe("2026-Q3");
+    expect(quarterTable(file.rows, "CFS", CORP)).toHaveLength(
+      quarterTable(file.rows, "CFS", "99999998").length,
+    );
+  });
+  it("rejects rows for a company that is not listed", () => {
+    const f = JSON.parse(
+      readFileSync("tests/fixtures/public-financials.synthetic.json", "utf8"),
+    );
+    f.companies = f.companies.slice(0, 1);
+    expect(publicFinSchema.safeParse(f).success).toBe(false);
+  });
+});
+
+describe("easy explanation (초등학생 눈높이, rule-based)", () => {
+  const fixture = publicFinSchema.parse(
+    JSON.parse(
+      readFileSync("tests/fixtures/public-financials.synthetic.json", "utf8"),
+    ),
+  );
+  it("explains growth and a loss-to-profit turn with numbers from the table", () => {
+    const e = explainQuarters(quarterTable(fixture.rows, "OFS", "99999998"));
+    expect(e.period).toBe("2026년 3분기");
+    expect(e.mood).toBe("better");
+    const text = e.sentences.join(" ");
+    expect(text).toContain("번 돈(매출)은 40억 원");
+    expect(text).toContain("1년 전 같은 때보다 29% 더 많이");
+    expect(text).toContain("손해였는데, 이번에는 돈이 남는 회사로 바뀌었어요");
+    expect(text).toContain("100원어치를 팔면 약 5원");
+    expect(text).toContain("꾸준히 커지는 중");
+    expect(e.caution.join(" ")).toContain("원인");
+  });
+  it("reports worse, missing comparison and no data without inventing values", () => {
+    const rows = quarterTable(fixture.rows, "CFS", "99999999").map((r) =>
+      r.key === "2026-Q3"
+        ? { ...r, revenueYoY: { value: -0.2 }, operatingIncome: -5e9 }
+        : r,
+    );
+    const worse = explainQuarters(rows);
+    expect(worse.mood).toBe("worse");
+    expect(worse.sentences.join(" ")).toContain("손해");
+    const single = explainQuarters(
+      quarterTable(fixture.rows, "CFS", "99999999").filter(
+        (r) => r.key === "2025-Q1",
+      ),
+    );
+    expect(single.sentences.join(" ")).toContain("비교는 못 했어요");
+    expect(single.mood).toBe("unknown");
+    expect(explainQuarters([]).headline).toContain("없어요");
   });
 });

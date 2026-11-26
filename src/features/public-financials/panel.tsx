@@ -7,6 +7,7 @@ import {
   publicFinSchema,
   quarterTable,
 } from "../../lib/connectors/public-financials";
+import { explainQuarters } from "../../lib/connectors/easy-explain";
 import {
   joinSheetChunks,
   parseCsv,
@@ -78,8 +79,11 @@ const pctPlain = new Intl.NumberFormat("ko-KR", {
   style: "percent",
   maximumFractionDigits: 1,
 });
+const eok1 = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
 const money = (v: number | null) =>
-  v === null ? "미집계" : `${eok.format(v / 1e8)}억`;
+  v === null
+    ? "미집계"
+    : `${(Math.abs(v) < 100e8 ? eok1 : eok).format(v / 1e8)}억`;
 const rate = (
   v: { value: number } | { value: null; reason: string },
   signed = false,
@@ -98,6 +102,8 @@ export function PublicFinancialsPanel() {
   const [inputError, setInputError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [fsDiv, setFsDiv] = useState<"CFS" | "OFS">("CFS");
+  const [corp, setCorp] = useState("");
+  const [view, setView] = useState<"easy" | "table">("easy");
 
   async function sync(src: FinSource) {
     setSyncing(true);
@@ -198,9 +204,25 @@ export function PublicFinancialsPanel() {
   }
 
   const latest = store.loaded ? latestFin(store.loaded.state) : null;
-  const table = latest
-    ? quarterTable(latest.file.rows, fsDiv).slice(0, 12)
-    : [];
+  const company =
+    latest?.file.companies.find((c) => c.corpCode === corp) ??
+    latest?.file.companies[0];
+  // Companies without subsidiaries only file 별도(OFS); fall back automatically.
+  const available = new Set(
+    latest?.file.rows
+      .filter((r) => r.corpCode === company?.corpCode)
+      .map((r) => r.fsDiv) ?? [],
+  );
+  const basis: "CFS" | "OFS" = available.has(fsDiv)
+    ? fsDiv
+    : available.has("CFS")
+      ? "CFS"
+      : "OFS";
+  const table =
+    latest && company
+      ? quarterTable(latest.file.rows, basis, company.corpCode).slice(0, 12)
+      : [];
+  const easy = explainQuarters(table);
   const coachSheet = (() => {
     try {
       return loadCoachSource(window.localStorage, session)?.sheetId || "";
@@ -314,17 +336,81 @@ export function PublicFinancialsPanel() {
         <p className="empty-state">아직 가져온 공시 실적이 없습니다.</p>
       ) : (
         <>
-          <div className="field">
-            <label htmlFor={`${ids}-fs`}>재무제표 기준</label>
-            <select
-              id={`${ids}-fs`}
-              value={fsDiv}
-              onChange={(e) => setFsDiv(e.target.value as "CFS" | "OFS")}
-            >
-              <option value="CFS">연결</option>
-              <option value="OFS">별도</option>
-            </select>
+          <div className="field-grid">
+            <div className="field">
+              <label htmlFor={`${ids}-corp`}>회사</label>
+              <select
+                id={`${ids}-corp`}
+                value={company?.corpCode}
+                onChange={(e) => setCorp(e.target.value)}
+              >
+                {latest.file.companies.map((c) => (
+                  <option key={c.corpCode} value={c.corpCode}>
+                    {c.corpName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor={`${ids}-fs`}>재무제표 기준</label>
+              <select
+                id={`${ids}-fs`}
+                value={basis}
+                onChange={(e) => setFsDiv(e.target.value as "CFS" | "OFS")}
+              >
+                <option value="CFS" disabled={!available.has("CFS")}>
+                  연결{available.has("CFS") ? "" : " (공시 없음)"}
+                </option>
+                <option value="OFS" disabled={!available.has("OFS")}>
+                  별도{available.has("OFS") ? "" : " (공시 없음)"}
+                </option>
+              </select>
+            </div>
           </div>
+          <div className="actions" role="group" aria-label="보기 방식">
+            <button
+              type="button"
+              aria-pressed={view === "easy"}
+              className={view === "easy" ? "primary" : undefined}
+              onClick={() => setView("easy")}
+            >
+              쉽게 보기
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "table"}
+              className={view === "table" ? "primary" : undefined}
+              onClick={() => setView("table")}
+            >
+              표로 보기
+            </button>
+          </div>
+          {view === "easy" && (
+            <section
+              className={`easy-fin easy-${easy.mood}`}
+              aria-labelledby={`${ids}-easy`}
+            >
+              <h3 id={`${ids}-easy`}>
+                {company?.corpName} 쉽게 보기
+                {easy.period ? ` · ${easy.period}` : ""}
+              </h3>
+              <p className="easy-headline">{easy.headline}</p>
+              <ul>
+                {easy.sentences.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+              {easy.caution.map((t, i) => (
+                <p key={i} className="subtle">
+                  {t}
+                </p>
+              ))}
+              <p className="subtle">
+                자동 설명(규칙 기반 {easy.version}) · AI 미사용 ·{" "}
+                {basis === "CFS" ? "연결" : "별도"} 기준
+              </p>
+            </section>
+          )}
           {!!latest.file.notes.length && (
             <ul className="coach-warnings" aria-label="공시 데이터 경고">
               {latest.file.notes.map((n, i) => (
@@ -332,56 +418,62 @@ export function PublicFinancialsPanel() {
               ))}
             </ul>
           )}
-          <div className="coach-table-wrap">
-            <table className="coach-table">
-              <caption>
-                분기 실적 ({fsDiv === "CFS" ? "연결" : "별도"}, 단위 억 원)
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">분기</th>
-                  <th scope="col">매출액</th>
-                  <th scope="col">영업이익</th>
-                  <th scope="col">영업이익률</th>
-                  <th scope="col">매출 전년동기比</th>
-                  <th scope="col">공시</th>
-                </tr>
-              </thead>
-              <tbody>
-                {table.map((t) => (
-                  <tr key={t.key}>
-                    <th scope="row">
-                      {t.year} Q{t.quarter}
-                      {t.derived ? "*" : ""}
-                    </th>
-                    <td>{money(t.revenue)}</td>
-                    <td>{money(t.operatingIncome)}</td>
-                    <td>{rate(t.operatingMargin)}</td>
-                    <td>{rate(t.revenueYoY, true)}</td>
-                    <td>
-                      {t.rceptNos.map((no) => (
-                        <a
-                          key={no}
-                          className="source-link"
-                          href={`https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${no}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          원문
-                          <span className="visually-hidden"> {no} (새 창)</span>
-                        </a>
-                      ))}
-                    </td>
+          {view === "table" && (
+            <div className="coach-table-wrap">
+              <table className="coach-table">
+                <caption>
+                  {company?.corpName} 분기 실적 (
+                  {basis === "CFS" ? "연결" : "별도"}, 단위 억 원)
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">분기</th>
+                    <th scope="col">매출액</th>
+                    <th scope="col">영업이익</th>
+                    <th scope="col">영업이익률</th>
+                    <th scope="col">매출 전년동기比</th>
+                    <th scope="col">공시</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {table.map((t) => (
+                    <tr key={t.key}>
+                      <th scope="row">
+                        {t.year} Q{t.quarter}
+                        {t.derived ? "*" : ""}
+                      </th>
+                      <td>{money(t.revenue)}</td>
+                      <td>{money(t.operatingIncome)}</td>
+                      <td>{rate(t.operatingMargin)}</td>
+                      <td>{rate(t.revenueYoY, true)}</td>
+                      <td>
+                        {t.rceptNos.map((no) => (
+                          <a
+                            key={no}
+                            className="source-link"
+                            href={`https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${no}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            원문
+                            <span className="visually-hidden">
+                              {" "}
+                              {no} (새 창)
+                            </span>
+                          </a>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="subtle">
             * 4분기는 사업보고서 연간값에서 3분기 누적값을 뺀 계산값입니다.
             미집계는 공시가 없거나 계산할 수 없는 값이며 0으로 처리하지
             않습니다. 가져온 시각 {latest.importedAt} · 생성{" "}
-            {latest.file.generatedAt} · 고유번호 {latest.file.corpCode}
+            {latest.file.generatedAt} · 고유번호 {company?.corpCode}
           </p>
         </>
       )}

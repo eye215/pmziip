@@ -294,8 +294,29 @@ test("DART public financials: sheet sync, quarterly table, idempotent", async ({
     .getByRole("button", { name: "공시 시트 연결", exact: true })
     .click();
   await expect(fin).toContainText("동기화 완료");
-  await expect(fin).toContainText("새 공시 반영 · 21개 항목");
+  await expect(fin).toContainText("새 공시 반영 · 35개 항목");
   expect(tabs).toEqual(["pmzip_dart"]);
+  // Default: plain-language view of the first company.
+  const easy = fin.getByRole("region", { name: /합성전자 쉽게 보기/ });
+  await expect(easy).toContainText("2026년 3분기");
+  await expect(easy).toContainText("한마디로: 1년 전보다 좋아지고 있어요.");
+  await expect(easy).toContainText("AI 미사용");
+  await fin
+    .getByLabel("회사", { exact: true })
+    .selectOption({ label: "합성에듀" });
+  const edu = fin.getByRole("region", { name: /합성에듀 쉽게 보기/ });
+  await expect(edu).toContainText("돈이 남는 회사로 바뀌었어요");
+  await expect(fin.getByLabel("재무제표 기준", { exact: true })).toHaveValue(
+    "OFS",
+  );
+  await noOverflow(page);
+  await fin
+    .getByLabel("회사", { exact: true })
+    .selectOption({ label: "합성전자" });
+  await fin.getByRole("button", { name: "표로 보기", exact: true }).click();
+  await expect(
+    fin.getByRole("button", { name: "표로 보기", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   const table = fin.getByRole("table");
   const q1 = table.getByRole("row", { name: /2026 Q1/ });
   await expect(q1).toContainText("1,000,000억");
@@ -309,5 +330,5 @@ test("DART public financials: sheet sync, quarterly table, idempotent", async ({
   await openPanel(page);
   await expect(
     page.getByRole("region", { name: "공시 실적 (DART)" }),
-  ).toContainText("변경 없음 · 21개 항목");
+  ).toContainText("변경 없음 · 35개 항목");
 });
