@@ -65,6 +65,20 @@ export const workStatuses = [
   "archived",
   "canceled",
 ] as const;
+/** A place users are expected to get stuck, checked after release. */
+export const frictionOutcomes = [
+  "unknown",
+  "happened",
+  "not_happened",
+] as const;
+export type FrictionOutcome = (typeof frictionOutcomes)[number];
+const frictionSchema = z
+  .object({
+    point: nonempty(500),
+    outcome: z.enum(frictionOutcomes),
+    note: z.string().max(2000),
+  })
+  .strict();
 export const initiativeInput = z
   .object({
     projectId: idSchema,
@@ -81,6 +95,18 @@ export const initiativeInput = z
     plannedAt: instant.nullable(),
     targetMonth: monthSchema.nullable(),
     status: z.enum(workStatuses),
+    // Case study (portfolio) — added later, so every field has a default and
+    // records saved before keep loading unchanged.
+    specUrl: reference.default(""),
+    siteUrl: reference.default(""),
+    beforeRef: reference.default(""),
+    afterRef: reference.default(""),
+    changeSummary: text.default(""),
+    releasedAt: instant.nullable().default(null),
+    expectedUsage: text.default(""),
+    frictions: z.array(frictionSchema).max(20).default([]),
+    retro: text.default(""),
+    nextTime: text.default(""),
   })
   .strict();
 const sourceSchema = sourceInput.extend({

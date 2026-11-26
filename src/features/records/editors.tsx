@@ -14,11 +14,13 @@ import {
   projectInput,
   sourceInput,
   initiativeInput,
+  frictionOutcomes,
   workStatuses,
   type RecordsState,
   type Source,
   type Initiative,
   type Command,
+  type FrictionOutcome,
 } from "./model";
 import { previewLegacy, importLegacy } from "./legacy";
 import { runtime, saveRecords, session } from "./browser-store";
@@ -684,6 +686,82 @@ function SourceChoices({
     </fieldset>
   );
 }
+type Friction = { point: string; outcome: FrictionOutcome; note: string };
+const frictionOutcomeNames: Record<FrictionOutcome, string> = {
+  unknown: "미확인",
+  happened: "실제로 막힘",
+  not_happened: "막히지 않음",
+};
+/** Expected sticking points; the outcome is filled in after release. */
+function FrictionList({
+  items,
+  change,
+}: {
+  items: Friction[];
+  change: (items: Friction[]) => void;
+}) {
+  const invalid = useInvalid("frictions");
+  const set = (i: number, patch: Partial<Friction>) =>
+    change(items.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  return (
+    <fieldset className="friction-list" {...invalid.props}>
+      <legend>예상 막힘 지점</legend>
+      {items.length === 0 && (
+        <p className="subtle">
+          사용자가 어디서 막힐지 예상되는 곳을 적어 두면, 배포 후 실제와
+          비교합니다.
+        </p>
+      )}
+      {items.map((f, i) => (
+        <div className="friction-row" key={i}>
+          <div className="field">
+            <label htmlFor={`friction-${i}`}>막힘 지점 {i + 1}</label>
+            <input
+              id={`friction-${i}`}
+              value={f.point}
+              onChange={(e) => {
+                invalid.clear();
+                set(i, { point: e.target.value });
+              }}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor={`friction-outcome-${i}`}>배포 후 결과</label>
+            <select
+              id={`friction-outcome-${i}`}
+              value={f.outcome}
+              onChange={(e) =>
+                set(i, { outcome: e.target.value as FrictionOutcome })
+              }
+            >
+              {frictionOutcomes.map((o) => (
+                <option key={o} value={o}>
+                  {frictionOutcomeNames[o]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => change(items.filter((_, j) => j !== i))}
+          >
+            삭제<span className="visually-hidden"> 막힘 지점 {i + 1}</span>
+          </button>
+        </div>
+      ))}
+      {items.length < 20 && (
+        <button
+          type="button"
+          onClick={() =>
+            change([...items, { point: "", outcome: "unknown", note: "" }])
+          }
+        >
+          막힘 지점 추가
+        </button>
+      )}
+    </fieldset>
+  );
+}
 function InitiativeEditor({ state, editor, close }: Props) {
   const old = state.initiatives.find((x) => x.id === editor.id),
     source = state.sources.find((x) => x.id === editor.sourceId);
@@ -706,7 +784,19 @@ function InitiativeEditor({ state, editor, close }: Props) {
     plannedAt: old?.plannedAt || "",
     targetMonth: old?.targetMonth || "",
     status: old?.status || "draft",
+    specUrl: old?.specUrl || "",
+    siteUrl: old?.siteUrl || "",
+    beforeRef: old?.beforeRef || "",
+    afterRef: old?.afterRef || "",
+    changeSummary: old?.changeSummary || "",
+    expectedUsage: old?.expectedUsage || "",
+    frictions: old?.frictions || [],
+    retro: old?.retro || "",
+    nextTime: old?.nextTime || "",
   });
+  const [released, setReleased] = useState(
+    old?.releasedAt ? localDateTime(old.releasedAt) : "",
+  );
   const [sourceIds, setSourceIds] = useState(
     old
       ? state.links
@@ -748,6 +838,10 @@ function InitiativeEditor({ state, editor, close }: Props) {
                 instantFromLocal(planned, old?.plannedAt),
               ),
               targetMonth: data.targetMonth || null,
+              releasedAt: atField("releasedAt", () =>
+                instantFromLocal(released, old?.releasedAt),
+              ),
+              frictions: data.frictions.filter((f) => f.point.trim()),
             }),
             sourceIds,
           },
@@ -918,6 +1012,91 @@ function InitiativeEditor({ state, editor, close }: Props) {
         change={(alternative) => setData({ ...data, alternative })}
         area
       />
+      <fieldset className="case-fields">
+        <legend>케이스 스터디 (선택)</legend>
+        <p className="subtle">
+          포트폴리오에 쓸 기록입니다. 링크는 회사 내부 주소여도 되며, 공개용으로
+          내보낼 때 가립니다.
+        </p>
+        <div className="field-grid">
+          <Field
+            name="work-spec"
+            path="specUrl"
+            label="기획서 링크"
+            type="url"
+            value={data.specUrl}
+            change={(specUrl) => setData({ ...data, specUrl })}
+          />
+          <Field
+            name="work-site"
+            path="siteUrl"
+            label="사이트 주소"
+            type="url"
+            value={data.siteUrl}
+            change={(siteUrl) => setData({ ...data, siteUrl })}
+          />
+          <Field
+            name="work-before"
+            path="beforeRef"
+            label="변경 전 화면 링크"
+            type="url"
+            value={data.beforeRef}
+            change={(beforeRef) => setData({ ...data, beforeRef })}
+          />
+          <Field
+            name="work-after"
+            path="afterRef"
+            label="변경 후 화면 링크"
+            type="url"
+            value={data.afterRef}
+            change={(afterRef) => setData({ ...data, afterRef })}
+          />
+        </div>
+        <Field
+          name="work-change-summary"
+          path="changeSummary"
+          label="바뀐 점"
+          value={data.changeSummary}
+          change={(changeSummary) => setData({ ...data, changeSummary })}
+          area
+        />
+        <Field
+          name="work-usage"
+          path="expectedUsage"
+          label="예상 사용 방식"
+          value={data.expectedUsage}
+          change={(expectedUsage) => setData({ ...data, expectedUsage })}
+          area
+        />
+        <FrictionList
+          items={data.frictions}
+          change={(frictions) => setData({ ...data, frictions })}
+        />
+        <Field
+          name="work-released"
+          path="releasedAt"
+          label="배포 일시"
+          type="datetime-local"
+          value={released}
+          change={setReleased}
+        />
+        <Field
+          name="work-retro"
+          path="retro"
+          label="아쉬운 점"
+          value={data.retro}
+          change={(retro) => setData({ ...data, retro })}
+          area
+        />
+        <Field
+          name="work-next"
+          path="nextTime"
+          label="다음에 다르게 할 것"
+          value={data.nextTime}
+          change={(nextTime) => setData({ ...data, nextTime })}
+          area
+        />
+      </fieldset>
       <SourceChoices
         sources={state.sources}
         ids={sourceIds}
