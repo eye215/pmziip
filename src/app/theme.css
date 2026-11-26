@@ -1,53 +1,87 @@
 /*
- * Visual theme: soft lavender background, blue→violet gradient header,
- * large rounded cards with light shadows, pill buttons and a floating pill
- * bottom menu on mobile. Loaded last; changes look only, not layout logic
- * (sizes the tests rely on — 44px targets, 52px mobile menu — are kept).
+ * PM.zip theme — "Evidence Flow" concept (docs: design concept artifact).
+ * Benchmarked on soft cards / pill controls, adapted: calm white surfaces and
+ * navy ink for daily work, brand blue→violet only for the logo and the
+ * payoff moments, five stage colors that mean state (수집·결정·변경·배포·성과).
+ * Loaded last; changes look only. Sizes the tests rely on (44px targets,
+ * 52px mobile menu) are kept.
  */
 :root {
-  --page: #f3f4fb;
-  --surface: #fff;
-  --ink: #1d2140;
-  --body: #4a4f6a;
-  --muted: #747a96;
-  --line: #e7e9f5;
-  --accent: #4f6ef7;
-  --accent-2: #7a6cf6;
-  --soft: #eef0ff;
-  --card-radius: 20px;
-  --shadow: 0 4px 18px rgba(72, 84, 170, 0.08);
-  --grad: linear-gradient(120deg, #4f7cf7 0%, #7a6cf6 100%);
-  --grad-card: linear-gradient(160deg, #ffffff 0%, #f6f4ff 100%);
-  --grad-cta: linear-gradient(90deg, #5fd0b4 0%, #5a7cf6 100%);
+  --page: #f5f6fb;
+  --surface: #ffffff;
+  --sunken: #f0f2f8;
+  --ink: #1a1d3a;
+  --body: #4b5070;
+  --muted: #8a8fa8;
+  --line: #e4e7f1;
+  --accent: #5b7cfa;
+  --accent-2: #7a63f0;
+  --soft: #eef1ff;
+  --st-collect: #3e9bf2;
+  --st-decide: #7a63f0;
+  --st-change: #e39a2d;
+  --st-release: #22b38a;
+  --st-impact: #5b7cfa;
+  --card-radius: 16px;
+  --shadow: 0 1px 2px rgba(26, 29, 58, 0.05), 0 6px 20px rgba(26, 29, 58, 0.06);
+  --shadow-float: 0 8px 28px rgba(26, 29, 58, 0.16);
+  --brand: linear-gradient(90deg, #5b7cfa 0%, #7a63f0 100%);
+  --commit: linear-gradient(90deg, #4fc9a4 0%, #5b7cfa 100%);
 }
 body {
   background: var(--page);
   color: var(--ink);
+  font-family:
+    var(--font-pretendard),
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.03em;
 }
 
-/* Header bar */
+/* Header: quiet surface, gradient only in the logo */
 .topbar {
-  background: var(--grad);
-  border-bottom: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
-.topbar .brand,
+.topbar .brand {
+  color: var(--ink);
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
 .topbar .brand span {
-  color: #fff;
+  background: var(--brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .topbar .mode {
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #fff;
+  background: var(--sunken);
+  border: 0;
+  color: var(--body);
   border-radius: 999px;
   padding: 5px 12px;
 }
-
-/* Hero */
-.intro h1 {
-  color: var(--ink);
-}
 .eyebrow {
   color: var(--accent);
+}
+.intro h1 {
+  color: var(--ink);
 }
 
 /* Cards */
@@ -59,82 +93,77 @@ body {
   box-shadow: var(--shadow);
   background: var(--surface);
 }
-.project {
-  background: var(--grad-card);
-}
 .project-symbol {
   border-radius: 12px;
   background: var(--soft);
   color: var(--accent);
 }
-.record-row {
-  border-color: var(--line);
-}
 .notice {
   background: var(--soft);
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   color: var(--body);
 }
 .error-box {
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 /* Inputs */
 select,
 input,
 textarea {
-  border-color: #dde1f2;
+  border-color: var(--line);
   border-radius: 12px;
 }
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(79, 110, 247, 0.35);
+  outline: 3px solid rgba(91, 124, 250, 0.3);
   outline-offset: 1px;
   border-color: var(--accent);
 }
 
-/* Buttons: pills */
+/* Buttons: pills. Primary = navy ink; the gradient is kept for commits. */
 button {
   border-radius: 999px;
-  border-color: #e1e4f4;
-  background: #f1f2fb;
+  border: 0;
+  background: var(--sunken);
   color: var(--ink);
   padding-left: 16px;
   padding-right: 16px;
 }
 button:hover:not(:disabled) {
-  background: #e8eafb;
+  background: #e6e9f3;
 }
 button.primary {
-  background: var(--grad-cta);
-  border-color: transparent;
+  background: var(--ink);
   color: #fff;
 }
 button.primary:hover:not(:disabled) {
-  background: var(--grad-cta);
-  filter: brightness(1.04);
+  background: #2a2e55;
+}
+button.commit,
+button.commit:hover:not(:disabled) {
+  background: var(--commit);
+  color: #fff;
 }
 button[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--ink);
   color: #fff;
 }
 
-/* Workspace menu */
+/* Workspace menu: selected = ink pill */
 .workspace-nav button {
   border: 0;
   background: transparent;
   color: var(--body);
 }
 .workspace-nav button:hover:not([aria-current="page"]) {
-  background: var(--soft);
+  background: var(--sunken);
 }
 .workspace-nav button[aria-current="page"] {
-  background: var(--accent);
+  background: var(--ink);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(79, 110, 247, 0.3);
 }
 @media (min-width: 1200px) {
   .workspace-nav {
@@ -149,7 +178,6 @@ button[aria-pressed="true"] {
   }
 }
 @media (max-width: 700px) {
-  /* Floating pill menu, same 52px buttons inside. */
   .workspace-nav {
     left: 10px;
     right: 10px;
@@ -157,39 +185,34 @@ button[aria-pressed="true"] {
     padding: 6px;
     border: 0;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 6px 24px rgba(40, 50, 120, 0.16);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: var(--shadow-float);
   }
   .workspace-nav button {
     background: transparent;
     border-radius: 999px;
   }
-  .workspace-nav button[aria-current="page"] {
-    background: var(--accent);
-  }
 }
 
-/* Details / small cards inside panels */
+/* Small cards inside panels */
 details > summary {
   border-radius: 12px;
 }
-.case-study,
-.report-case,
-.report-saved {
-  border-radius: 14px;
-}
 .report-summary > div {
   border: 0;
-  border-radius: 14px;
-  background: var(--grad-card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 12px;
+  background: var(--sunken);
 }
 .report-summary dd {
-  color: var(--accent);
+  color: var(--ink);
 }
 .case-fields,
 .friction-list {
   border-color: var(--line);
   border-radius: 16px;
-  background: #fbfbff;
+  background: #fbfbfe;
+}
+.subtle,
+.scope-note {
+  color: var(--muted);
 }

@@ -98,7 +98,7 @@ async function overflow(page: Page) {
   }, width);
 }
 async function seedLongRecords(page: Page) {
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await page.getByRole("button", { name: "원문 등록", exact: true }).click();
   await page.getByLabel("원문 제목", { exact: true }).fill(LONG_TITLE);
   await page.getByLabel("원문 내용", { exact: true }).fill(LONG_RAW);
@@ -140,7 +140,7 @@ test("long titles, English, URLs and raw text do not overflow horizontally", asy
   await boot(page);
   await seedLongRecords(page);
   // Long project / client names on the projects tab.
-  await tab(page, "프로젝트");
+  await tab(page, "홈");
   await page
     .getByRole("button", { name: "프로젝트 추가", exact: true })
     .click();
@@ -155,7 +155,7 @@ test("long titles, English, URLs and raw text do not overflow horizontally", asy
   await capture(page, info.project.name, "projects");
   expect.soft(await overflow(page)).toEqual([]);
 
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await openAllDetails(page);
   await capture(page, info.project.name, "inbox");
   expect.soft(await overflow(page)).toEqual([]);
@@ -167,7 +167,7 @@ test("long titles, English, URLs and raw text do not overflow horizontally", asy
   expect.soft(await overflow(page)).toEqual([]);
   await page.getByRole("button", { name: "취소", exact: true }).click();
 
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await openAllDetails(page);
   await capture(page, info.project.name, "work");
   expect.soft(await overflow(page)).toEqual([]);
@@ -179,7 +179,7 @@ test("long titles, English, URLs and raw text do not overflow horizontally", asy
 });
 
 async function openSourceEditor(page: Page) {
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   const add = page.getByRole("button", { name: "원문 등록", exact: true });
   await add.focus();
   await page.keyboard.press("Enter");
@@ -224,7 +224,7 @@ test("closing an editor returns focus to the button that opened it", async ({
   await expect(page.locator(".editor")).toHaveCount(0);
   await expect(edit).toBeFocused();
   // Pointer/touch: WebKit does not focus a clicked button, still restored.
-  await tab(page, "프로젝트");
+  await tab(page, "홈");
   const client = page.getByRole("button", { name: "고객사 추가", exact: true });
   await client.click();
   await page.getByRole("button", { name: "취소", exact: true }).click();
@@ -342,7 +342,7 @@ test("detail labels are Korean while stored values and times stay unchanged", as
   expect([src.sourceType, src.sensitivity]).toEqual(["manual", "internal"]);
   expect([work.category, work.priority]).toEqual(["improvement", "high"]);
 
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   const card = page.getByRole("article", {
     name: "표시 합성 원문 과제",
     exact: true,
@@ -446,12 +446,7 @@ test("touch targets ≥44px, bottom menu reachable, save button not covered", as
   // Bottom menu: each item ≥52px on mobile, inside the viewport, keyboard usable.
   const menu = nav(page);
   const viewport = page.viewportSize()!;
-  for (const name of [
-    "프로젝트",
-    "통합 수집함",
-    "개선 과제",
-    "백업·가져오기",
-  ]) {
+  for (const name of ["홈", "수집함", "과제", "설정"]) {
     const box = (await menu
       .getByRole("button", { name, exact: true })
       .boundingBox())!;
@@ -462,12 +457,12 @@ test("touch targets ≥44px, bottom menu reachable, save button not covered", as
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 0.5);
   }
   await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
-  await menu.getByRole("button", { name: "개선 과제", exact: true }).focus();
+  await menu.getByRole("button", { name: "과제", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("heading", { name: "개선 과제", exact: true }),
+    page.getByRole("heading", { name: "과제", exact: true }),
   ).toBeVisible();
   await expect(
-    menu.getByRole("button", { name: "개선 과제", exact: true }),
+    menu.getByRole("button", { name: "과제", exact: true }),
   ).toHaveAttribute("aria-current", "page");
 });

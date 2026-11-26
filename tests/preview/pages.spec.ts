@@ -17,7 +17,7 @@ test("exported Pages artifact loads scripts, navigates, saves and restores local
     page.getByRole("heading", { name: "Demo Coach", exact: true }),
   ).toBeVisible();
   const menu = page.getByRole("navigation", { name: "워크스페이스 메뉴" });
-  await menu.getByRole("button", { name: "통합 수집함", exact: true }).click();
+  await menu.getByRole("button", { name: "수집함", exact: true }).click();
   await page.getByRole("button", { name: "원문 등록", exact: true }).click();
   await page
     .getByLabel("원문 제목", { exact: true })
@@ -33,7 +33,7 @@ test("exported Pages artifact loads scripts, navigates, saves and restores local
   await expect(
     page.getByRole("heading", { name: "합성 미리보기 확인", exact: true }),
   ).toBeVisible();
-  await menu.getByRole("button", { name: "프로젝트", exact: true }).click();
+  await menu.getByRole("button", { name: "홈", exact: true }).click();
   await page
     .getByRole("button", { name: "지표·전략", exact: true })
     .first()

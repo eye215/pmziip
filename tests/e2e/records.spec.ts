@@ -26,7 +26,7 @@ async function save(page: Page) {
   await expect(page.locator(".editor")).toHaveCount(0);
 }
 async function source(page: Page, title = "공통 요구") {
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await page.getByRole("button", { name: "원문 등록", exact: true }).click();
   expect(
     await page.evaluate(
@@ -76,7 +76,7 @@ test("one source → two projects; scope/month filters, rename/move/archive and 
   expect(state.links).toHaveLength(2);
   expect(state.sources[0].rawText).toBe(raw);
   expect(await page.evaluate(() => "__unsafe" in window)).toBe(false);
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await page
     .getByLabel("조회 범위", { exact: true })
     .selectOption("project:" + COACH);
@@ -95,7 +95,7 @@ test("one source → two projects; scope/month filters, rename/move/archive and 
   await expect(
     page.getByRole("article", { name: "Survey 입력 개선 과제", exact: true }),
   ).toBeVisible();
-  await tab(page, "프로젝트");
+  await tab(page, "홈");
   await page.getByLabel("조회 범위", { exact: true }).selectOption("all");
   const coach = page.getByRole("article", {
     name: "Demo Coach 프로젝트",
@@ -138,7 +138,7 @@ test("one source → two projects; scope/month filters, rename/move/archive and 
     fullPage: true,
   });
   await page.getByLabel("조회 월", { exact: true }).fill("2026-11");
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await page
     .getByRole("article", { name: "공통 요구 원문", exact: true })
     .getByText("원문·출처·수정 이력", { exact: true })
@@ -179,7 +179,7 @@ test("source edit keeps original history; legacy preview requires approval and i
     },
   ]);
   for (const first of [true, false]) {
-    await tab(page, "백업·가져오기");
+    await tab(page, "설정");
     await page
       .getByRole("button", { name: "이전 버전 가져오기", exact: true })
       .click();
@@ -240,7 +240,7 @@ test("failed local write preserves confirmed data and typed input", async ({
     ),
   ).toBe(1);
   await page.reload();
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await expect(
     page.getByRole("article", { name: "저장된 원문 원문", exact: true }),
   ).toBeVisible();
@@ -263,7 +263,7 @@ test("damaged storage is never silently replaced", async ({ page }) => {
 
 test("another tab cannot overwrite an open edit", async ({ page, context }) => {
   await boot(page);
-  await tab(page, "통합 수집함");
+  await tab(page, "수집함");
   await page.getByRole("button", { name: "원문 등록", exact: true }).click();
   await page.getByLabel("원문 제목", { exact: true }).fill("첫 탭 초안");
   await page.getByLabel("원문 내용", { exact: true }).fill("보존할 입력");
@@ -320,7 +320,7 @@ test("client/project creation validates input, and reviewed task merge preserves
   await source(page);
   await work(page, "중복 검토 A", COACH);
   await work(page, "중복 검토 B", COACH);
-  await tab(page, "개선 과제");
+  await tab(page, "과제");
   await page
     .getByRole("article", { name: "중복 검토 A 과제", exact: true })
     .getByRole("button", { name: "중복 검토·병합", exact: true })
@@ -370,7 +370,7 @@ test("simultaneous tab saves are serialized; only one initial revision can commi
     [page, "동시 초안 A"],
     [other, "동시 초안 B"],
   ] as const) {
-    await tab(p, "통합 수집함");
+    await tab(p, "수집함");
     await p.getByRole("button", { name: "원문 등록", exact: true }).click();
     await p.getByLabel("원문 제목", { exact: true }).fill(title);
     await p.getByLabel("원문 내용", { exact: true }).fill("합성 동시 저장");
