@@ -1,0 +1,195 @@
+/*
+ * Visual theme: soft lavender background, blue→violet gradient header,
+ * large rounded cards with light shadows, pill buttons and a floating pill
+ * bottom menu on mobile. Loaded last; changes look only, not layout logic
+ * (sizes the tests rely on — 44px targets, 52px mobile menu — are kept).
+ */
+:root {
+  --page: #f3f4fb;
+  --surface: #fff;
+  --ink: #1d2140;
+  --body: #4a4f6a;
+  --muted: #747a96;
+  --line: #e7e9f5;
+  --accent: #4f6ef7;
+  --accent-2: #7a6cf6;
+  --soft: #eef0ff;
+  --card-radius: 20px;
+  --shadow: 0 4px 18px rgba(72, 84, 170, 0.08);
+  --grad: linear-gradient(120deg, #4f7cf7 0%, #7a6cf6 100%);
+  --grad-card: linear-gradient(160deg, #ffffff 0%, #f6f4ff 100%);
+  --grad-cta: linear-gradient(90deg, #5fd0b4 0%, #5a7cf6 100%);
+}
+body {
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Header bar */
+.topbar {
+  background: var(--grad);
+  border-bottom: 0;
+}
+.topbar .brand,
+.topbar .brand span {
+  color: #fff;
+}
+.topbar .mode {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+/* Hero */
+.intro h1 {
+  color: var(--ink);
+}
+.eyebrow {
+  color: var(--accent);
+}
+
+/* Cards */
+.panel,
+.project,
+.filters {
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow);
+  background: var(--surface);
+}
+.project {
+  background: var(--grad-card);
+}
+.project-symbol {
+  border-radius: 12px;
+  background: var(--soft);
+  color: var(--accent);
+}
+.record-row {
+  border-color: var(--line);
+}
+.notice {
+  background: var(--soft);
+  border: 0;
+  border-radius: 14px;
+  color: var(--body);
+}
+.error-box {
+  border-radius: 14px;
+}
+
+/* Inputs */
+select,
+input,
+textarea {
+  border-color: #dde1f2;
+  border-radius: 12px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(79, 110, 247, 0.35);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* Buttons: pills */
+button {
+  border-radius: 999px;
+  border-color: #e1e4f4;
+  background: #f1f2fb;
+  color: var(--ink);
+  padding-left: 16px;
+  padding-right: 16px;
+}
+button:hover:not(:disabled) {
+  background: #e8eafb;
+}
+button.primary {
+  background: var(--grad-cta);
+  border-color: transparent;
+  color: #fff;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--grad-cta);
+  filter: brightness(1.04);
+}
+button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Workspace menu */
+.workspace-nav button {
+  border: 0;
+  background: transparent;
+  color: var(--body);
+}
+.workspace-nav button:hover:not([aria-current="page"]) {
+  background: var(--soft);
+}
+.workspace-nav button[aria-current="page"] {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(79, 110, 247, 0.3);
+}
+@media (min-width: 1200px) {
+  .workspace-nav {
+    background: var(--surface);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow);
+    padding: 8px;
+    gap: 4px;
+  }
+  .workspace-nav button {
+    padding-left: 16px;
+  }
+}
+@media (max-width: 700px) {
+  /* Floating pill menu, same 52px buttons inside. */
+  .workspace-nav {
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    padding: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 6px 24px rgba(40, 50, 120, 0.16);
+  }
+  .workspace-nav button {
+    background: transparent;
+    border-radius: 999px;
+  }
+  .workspace-nav button[aria-current="page"] {
+    background: var(--accent);
+  }
+}
+
+/* Details / small cards inside panels */
+details > summary {
+  border-radius: 12px;
+}
+.case-study,
+.report-case,
+.report-saved {
+  border-radius: 14px;
+}
+.report-summary > div {
+  border: 0;
+  border-radius: 14px;
+  background: var(--grad-card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.report-summary dd {
+  color: var(--accent);
+}
+.case-fields,
+.friction-list {
+  border-color: var(--line);
+  border-radius: 16px;
+  background: #fbfbff;
+}

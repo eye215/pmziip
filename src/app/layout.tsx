@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "../features/records/records.css";
+import "./theme.css";
 
 export const metadata: Metadata = {
   title: "PM.zip · 제품 성과 워크스페이스",
