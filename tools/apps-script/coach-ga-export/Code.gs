@@ -59,9 +59,21 @@ function exportToSheet() {
 /** Installs one daily trigger (06:00-07:00 script time zone). Safe to re-run. */
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'exportToSheet') ScriptApp.deleteTrigger(t);
+    var h = t.getHandlerFunction();
+    if (h === 'exportToSheet' || h === 'dailyExport') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('exportToSheet').timeBased().everyDays(1).atHour(6).create();
+  ScriptApp.newTrigger('dailyExport').timeBased().everyDays(1).atHour(6).create();
+}
+
+/** Daily job: GA export, then DART public financials if configured (Dart.gs). */
+function dailyExport() {
+  var errors = [];
+  try { exportToSheet(); } catch (e) { errors.push('GA: ' + e.message); }
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DART_API_KEY') && props.getProperty('DART_CORP_CODE')) {
+    try { exportDartToSheet(); } catch (e) { errors.push('DART: ' + e.message); }
+  }
+  if (errors.length) throw new Error(errors.join(' / '));
 }
 
 /** JSON with non-ASCII escaped, so chunk boundaries never split a character. */
@@ -80,10 +92,10 @@ function sha256Hex_(text) {
     .join('');
 }
 /** Each chunk is wrapped in "|" so Sheets never turns it into a number/formula. */
-function writeChunks_(sheet, json) {
+function writeChunks_(sheet, json, header) {
   var chunks = [];
   for (var i = 0; i < json.length; i += CHUNK_SIZE) chunks.push('|' + json.slice(i, i + CHUNK_SIZE) + '|');
-  var rows = [[CHUNK_HEADER + '|v1|' + chunks.length + '|' + sha256Hex_(json)]].concat(
+  var rows = [[(header || CHUNK_HEADER) + '|v1|' + chunks.length + '|' + sha256Hex_(json)]].concat(
     chunks.map(function (c) { return [c]; }),
   );
   sheet.clearContents();
