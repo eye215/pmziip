@@ -17,7 +17,17 @@ import {
   type Report,
   type ReportContent,
 } from "./model";
+import { maskText, parseHidden, type Masking } from "./public-export";
 import "./report.css";
+
+const hideKey = `pmzip:public-hide:v1:${session.ownerId}:${session.workspaceId}`;
+function readHide() {
+  try {
+    return window.localStorage.getItem(hideKey) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 function observeFor(state: RecordsState) {
   return (w: Initiative): Observed => {
@@ -109,6 +119,25 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** Portfolio copy: names aliased, listed words hidden, money masked. */
+function PublicExport({ text, masking }: { text: string; masking: Masking }) {
+  const id = useId();
+  const masked = maskText(text, masking);
+  return (
+    <details className="report-public">
+      <summary>공개용 미리보기</summary>
+      <label htmlFor={id}>가린 결과 (읽기 전용)</label>
+      <textarea id={id} readOnly value={masked} rows={10} />
+      <CopyButton text={masked} />
+      <p className="subtle">
+        프로젝트·고객사 이름은 별칭으로, 링크·이메일·전화번호와 금액·큰 수치는
+        가렸습니다. 비율(%, %p)과 날짜는 남깁니다. 공개 전에 회사 규정을
+        확인하고 직접 한 번 더 읽어 주세요.
+      </p>
+    </details>
+  );
+}
+
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 /** "내 성과 보고서": live draft for a period, then an immutable snapshot. */
@@ -117,6 +146,12 @@ export function ReportPanel({ state }: { state: RecordsState }) {
   const timeZone = state.workspace.projects[0]?.timezone || "Asia/Seoul";
   const [from, setFrom] = useState(() => `${thisMonth().slice(0, 4)}-01`);
   const [to, setTo] = useState(thisMonth);
+  const [hide, setHide] = useState(readHide);
+  const masking: Masking = {
+    projects: state.workspace.projects.map((p) => p.name),
+    clients: state.workspace.clients.map((c) => c.name),
+    hidden: parseHidden(hide),
+  };
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<Report[]>(() => {
@@ -198,6 +233,24 @@ export function ReportPanel({ state }: { state: RecordsState }) {
             </button>
             <CopyButton text={reportText(draft)} />
           </div>
+          <div className="field">
+            <label htmlFor={`${ids}-hide`}>
+              공개할 때 가릴 단어 (쉼표로: 회사명, 제품명, 사람 이름 등)
+            </label>
+            <input
+              id={`${ids}-hide`}
+              value={hide}
+              onChange={(e) => {
+                setHide(e.target.value);
+                try {
+                  window.localStorage.setItem(hideKey, e.target.value);
+                } catch {
+                  // Convenience only; masking still works for this view.
+                }
+              }}
+            />
+          </div>
+          <PublicExport text={reportText(draft)} masking={masking} />
         </>
       )}
       {error && (
@@ -227,6 +280,7 @@ export function ReportPanel({ state }: { state: RecordsState }) {
               </summary>
               <ReportBody r={r} />
               <CopyButton text={reportText(r)} />
+              <PublicExport text={reportText(r)} masking={masking} />
             </details>
           ))
       )}
