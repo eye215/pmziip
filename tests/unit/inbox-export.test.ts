@@ -414,6 +414,23 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
     vm.runInContext("buildInboxExport_()", m.ctx);
     expect(m.searches.at(-1)).toBe('(label:"고객요청") newer_than:30d');
   });
+  it("run from the script editor (no sheet UI): labels go to the sheet as checkboxes, nothing is switched on", () => {
+    const m = load({ INBOX_CALENDAR_DAYS: "0" });
+    const logs: string[] = [];
+    m.ctx.Logger = { log: (x: string) => logs.push(x) };
+    (m.ctx.SpreadsheetApp as Record<string, unknown>).getUi = () => {
+      throw new Error("Cannot call SpreadsheetApp.getUi() from this context.");
+    };
+    vm.runInContext("pmzipPickLabels()", m.ctx);
+    expect(logs.at(-1)).toContain("라벨 2개를 체크박스로 넣었습니다");
+    const grid = m.fake.grids.get("pmzip_settings")!;
+    expect(grid.some((r) => r[0] === "Gmail 라벨 목록")).toBe(true);
+    // Yes/No confirmation cannot be asked → INBOX_SHEET stays off, no export.
+    vm.runInContext("pmzipRunInboxNow()", m.ctx);
+    expect(m.store.INBOX_SHEET).toBeUndefined();
+    expect(m.searches).toHaveLength(0);
+    expect(logs.at(-1)).toContain("공유 시트에 메일 기록");
+  });
   it("labels typed directly in the pmzip_settings tab win over Script Properties", () => {
     const m = load(
       { INBOX_GMAIL_LABEL: "PMZIP", INBOX_CALENDAR_DAYS: "0" },
