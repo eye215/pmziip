@@ -94,3 +94,93 @@ test("case study fields save on the initiative and show as eight lines", async (
     ),
   ).toBe(true);
 });
+
+test("released Coach initiative shows GA before/after as observations", async ({
+  page,
+}) => {
+  const { readFile } = await import("node:fs/promises");
+  const base = JSON.parse(
+    await readFile("tests/fixtures/coach-export.synthetic.json", "utf8"),
+  ).periods[0];
+  const snap = (
+    i: number,
+    startDate: string,
+    endDate: string,
+    done: number,
+  ) => ({
+    id: `00000000-0000-4000-8000-${String(700 + i).padStart(12, "0")}`,
+    projectId: COACH,
+    importedAt: "2026-11-28T00:00:00.000Z",
+    source: "apps-script-export",
+    generator: { name: "test", version: "1" },
+    definitionVersion: "coach-ga4-1.2",
+    propertyTimeZone: "Asia/Seoul",
+    generatedAt: "2026-11-28T00:00:00.000Z",
+    contentHash: String(i).repeat(64).slice(0, 64),
+    period: {
+      ...base,
+      startDate,
+      endDate,
+      totals: {
+        main: { users: 1000, count: 4000 },
+        start: { users: 100, count: 200 },
+        done: { users: 50, count: done },
+      },
+    },
+  });
+  await page.goto("/");
+  await page.evaluate(
+    (store) => {
+      localStorage.setItem(
+        "pmzip:coach-ga:v1:00000000-0000-4000-8000-000000000010:00000000-0000-4000-8000-000000000001",
+        JSON.stringify(store),
+      );
+    },
+    {
+      schemaVersion: 1,
+      ownerId: "00000000-0000-4000-8000-000000000010",
+      workspaceId: "00000000-0000-4000-8000-000000000001",
+      revision: 1,
+      snapshots: [
+        snap(1, "2026-11-10", "2026-11-16", 60),
+        snap(2, "2026-11-21", "2026-11-27", 80),
+      ],
+    },
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Demo Coach", exact: true }),
+  ).toBeVisible();
+  await tab(page, "개선 과제");
+  await page.getByRole("button", { name: "과제 추가", exact: true }).click();
+  await page.getByLabel("과제 프로젝트", { exact: true }).selectOption(COACH);
+  await page
+    .getByLabel("과제 제목", { exact: true })
+    .fill("합성 완료 흐름 개선");
+  await page.getByLabel("목표 월", { exact: true }).fill("2026-11");
+  await page.getByLabel("업무 상태", { exact: true }).selectOption("released");
+  await page.getByLabel("배포 일시", { exact: true }).fill("2026-11-18T10:00");
+  await page
+    .getByRole("button", { name: "확인하고 저장", exact: true })
+    .click();
+  await expect(page.locator(".editor")).toHaveCount(0);
+  await page.getByLabel("월 기준", { exact: true }).selectOption("target");
+  const card = page
+    .getByRole("article")
+    .filter({ hasText: "합성 완료 흐름 개선" });
+  await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
+  const table = card.getByRole("table");
+  await expect(table).toContainText("배포 전후 7일");
+  await expect(table.getByRole("row", { name: /횟수 완료율/ })).toContainText(
+    "+10.0%p",
+  );
+  await expect(card.locator(".case-lines li").nth(5)).toContainText(
+    "배포 전후 7일 횟수 완료율 30% → 40% (+10.0%p)",
+  );
+  await expect(card).toContainText("관찰값입니다");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
