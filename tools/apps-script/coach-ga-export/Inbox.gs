@@ -72,6 +72,13 @@ function buildInboxExport_() {
       });
     });
   }
+  var notes = [];
+  if (typeof slackItems_ === 'function') {
+    var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
+    items = items.concat(slack.items);
+    notes = slack.notes;
+  }
+  if (notes.length) Logger.log(notes.join(' / '));
   return {
     format: 'pmzip.inbox-export',
     formatVersion: 1,

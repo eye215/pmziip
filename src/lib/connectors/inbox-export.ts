@@ -9,7 +9,7 @@ import { z } from "zod";
 export const INBOX_FORMAT = "pmzip.inbox-export";
 const item = z
   .object({
-    channel: z.enum(["gmail", "calendar"]),
+    channel: z.enum(["gmail", "calendar", "slack"]),
     externalId: z.string().min(1).max(300),
     title: z.string().max(300),
     body: z.string().max(20000),
