@@ -17,13 +17,26 @@ function inboxDomain_(from) {
   return m ? '@' + m[1].toLowerCase() : null;
 }
 
+/**
+ * Gmail search: INBOX_GMAIL_QUERY (advanced, used as is) or one or more labels
+ * from INBOX_GMAIL_LABEL ("PMZIP, 고객요청"), always limited to recent days.
+ */
+function inboxQuery_(label, query, days) {
+  var scope = query
+    ? '(' + query + ')'
+    : '(' + String(label).split(',').map(function (l) { return l.trim().replace(/"/g, ''); })
+        .filter(String).map(function (l) { return 'label:"' + l + '"'; }).join(' OR ') + ')';
+  return scope + ' newer_than:' + days + 'd';
+}
+
 function buildInboxExport_() {
   var props = PropertiesService.getScriptProperties();
   var label = props.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var query = (props.getProperty('INBOX_GMAIL_QUERY') || '').trim();
   var days = Number(props.getProperty('INBOX_DAYS') || 30);
   var calDays = Number(props.getProperty('INBOX_CALENDAR_DAYS') || 14);
   var items = [];
-  var threads = GmailApp.search('label:"' + label.replace(/"/g, '') + '" newer_than:' + days + 'd', 0, 100);
+  var threads = GmailApp.search(inboxQuery_(label, query, days), 0, 100);
   threads.forEach(function (thread) {
     var link = thread.getPermalink();
     thread.getMessages().forEach(function (m) {
@@ -64,7 +77,7 @@ function buildInboxExport_() {
     formatVersion: 1,
     generatedAt: new Date().toISOString(),
     generator: INBOX_GENERATOR,
-    query: { gmailLabel: label, calendarDays: calDays > 0 ? calDays : null },
+    query: { gmailLabel: query ? 'query: ' + query.slice(0, 180) : label, calendarDays: calDays > 0 ? calDays : null },
     items: items,
   };
 }
