@@ -11,7 +11,6 @@ import {
   type CompareWindow,
 } from "../coach-data/release-compare";
 
-
 function ReleaseCompare({ windows }: { windows: CompareWindow[] }) {
   const shown = windows
     .map((w) => ({ w, rows: compareRows(w) }))
@@ -130,9 +129,7 @@ export function CaseStudyView({
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(caseStudyText(work, lines));
-              setCopied(
-                "복사했습니다. 회사명·수치는 공개 전에 직접 가려 주세요.",
-              );
+              setCopied("복사했습니다.");
             } catch {
               setCopied("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.");
             }
