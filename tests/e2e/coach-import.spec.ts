@@ -26,7 +26,7 @@ async function openPanel(page: Page) {
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "백업·가져오기", exact: true })
+    .getByRole("button", { name: "설정", exact: true })
     .click();
   const panel = page.getByRole("region", { name: "Galaxy Coach GA 가져오기" });
   await expect(panel).toBeVisible();
@@ -140,7 +140,7 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   await noOverflow(page);
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "백업·가져오기", exact: true })
+    .getByRole("button", { name: "설정", exact: true })
     .click();
 
   // Records state is untouched; GA data lives under its own key.
@@ -186,7 +186,7 @@ test("Coach GA export: validate, preview, approve, save once, reload", async ({
   // Coach card shows the latest full month; other projects stay "미수집".
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "프로젝트", exact: true })
+    .getByRole("button", { name: "홈", exact: true })
     .click();
   const card = page.getByRole("article", {
     name: "Demo Coach 프로젝트",

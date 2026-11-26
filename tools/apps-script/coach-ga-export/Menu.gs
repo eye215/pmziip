@@ -166,7 +166,7 @@ function pmzipRunInboxNow() {
   var status = exportInboxToSheet();
   ui.alert(
     'pmzip_inbox 탭을 갱신했습니다.\n\n' + status +
-      '\n\nPM.zip의 통합 수집함 > 요구사항 수집에서 "시트에서 새 메일 확인"을 누르세요.' +
+      '\n\nPM.zip의 수집함 > 요구사항 수집에서 "시트에서 새 메일 확인"을 누르세요.' +
       (/^Gmail 0건/.test(status) ? '\n\nGmail이 0건이면: 이 계정에 해당 라벨이 붙은 최근 메일이 있는지, 메뉴 "가져올 Gmail 라벨 설정"을 확인하세요.' : ''),
   );
 }

@@ -3,7 +3,7 @@
  * Same Apps Script project as Code.gs. PRIVATE path: message bodies are NOT
  * written to the link-shared sheet. Download the JSON from the web app
  * (Deploy > Web app, Execute as: Me, Who has access: Only myself) with
- * ?inbox=1 and import it in PM.zip (통합 수집함 > 요구사항 수집 > Gmail·캘린더 파일).
+ * ?inbox=1 and import it in PM.zip (수집함 > 요구사항 수집 > Gmail·캘린더 파일).
  * - Script Properties: INBOX_GMAIL_LABEL (default "PMZIP"), INBOX_DAYS (default 30),
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.

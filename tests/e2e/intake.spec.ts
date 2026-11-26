@@ -24,7 +24,7 @@ async function openIntake(page: Page) {
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "워크스페이스 메뉴" })
-    .getByRole("button", { name: "통합 수집함", exact: true })
+    .getByRole("button", { name: "수집함", exact: true })
     .click();
   const intake = page.getByRole("region", { name: "요구사항 수집" });
   await expect(intake).toBeVisible();

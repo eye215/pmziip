@@ -537,7 +537,7 @@ export function MeasurementWorkspace({
             </>
           ) : (
             <p className="empty-state">
-              프로젝트에 활성 과제가 없습니다. 개선 과제에서 먼저 작성해 주세요.
+              프로젝트에 활성 과제가 없습니다. 과제 메뉴에서 먼저 작성해 주세요.
             </p>
           )}
         </section>
