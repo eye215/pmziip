@@ -71,12 +71,17 @@ describe("StatCounter CSV", () => {
   });
 });
 
-describe("StatCounter.gs exporter ↔ PM.zip", () => {
-  it("fetches each country once, skips failures with a note, round-trips via sheet", async () => {
+describe("StatCounter.gs exporter ↔ PM.zip (resumable, many countries)", () => {
+  /** Fake Apps Script world with a clock that advances 2 minutes per batch. */
+  function world(
+    countries: string,
+    csvFor: (code: string) => { code: number; text: string },
+  ) {
     const urls: string[] = [];
     const sheets = new Map<string, string[][]>();
     const sheet = (name: string) => ({
       clearContents: () => sheets.set(name, []),
+      getDataRange: () => ({ getValues: () => sheets.get(name) ?? [] }),
       getRange: () => {
         const r = {
           setNumberFormat: () => r,
@@ -93,18 +98,20 @@ describe("StatCounter.gs exporter ↔ PM.zip", () => {
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (k: string) =>
-            ({ STATCOUNTER_COUNTRIES: "xa, XB, XC" })[k] ?? null,
+            ({ STATCOUNTER_COUNTRIES: countries })[k] ?? null,
         }),
       },
       UrlFetchApp: {
-        fetch: (url: string) => {
-          urls.push(url);
-          const code = new URL(url).searchParams.get("region_hidden");
-          return {
-            getResponseCode: () => (code === "XC" ? 404 : 200),
-            getContentText: () =>
-              code === "XA" ? XA : csv(["2026-10,10,80,10"]),
-          };
+        fetchAll: (reqs: { url: string }[]) => {
+          vm.runInContext("__now += 120000", ctx);
+          return reqs.map(({ url }) => {
+            urls.push(url);
+            const r = csvFor(new URL(url).searchParams.get("region_hidden")!);
+            return {
+              getResponseCode: () => r.code,
+              getContentText: () => r.text,
+            };
+          });
         },
       },
       Utilities: {
@@ -119,6 +126,7 @@ describe("StatCounter.gs exporter ↔ PM.zip", () => {
         DigestAlgorithm: { SHA_256: "SHA_256" },
         Charset: { UTF_8: "UTF_8" },
       },
+      Logger: { log: () => {} },
       Session: { getScriptTimeZone: () => "Asia/Seoul" },
       SpreadsheetApp: {
         getActiveSpreadsheet: () => ({
@@ -131,29 +139,98 @@ describe("StatCounter.gs exporter ↔ PM.zip", () => {
       },
     };
     vm.createContext(ctx);
+    vm.runInContext(
+      "var __now = Date.UTC(2026, 10, 26); Date.now = function () { return __now; };",
+      ctx,
+    );
     for (const f of ["Code.gs", "StatCounter.gs"])
       vm.runInContext(
         readFileSync(`tools/apps-script/coach-ga-export/${f}`, "utf8"),
         ctx,
       );
-    vm.runInContext("exportStatCounterToSheet()", ctx);
-    expect(urls).toHaveLength(3);
-    expect(urls[0]).toContain("fromInt=202411");
-    expect(urls[0]).toContain("toInt=202610");
-    const rows = sheets.get("pmzip_statcounter")!;
-    const text = await joinSheetChunks(
-      parseCsv(rows.map((r) => `"${r[0].replaceAll('"', '""')}"`).join("\n")),
-      sha256,
-      MARKET_CHUNK_HEADER,
-      "pmzip_statcounter",
+    vm.runInContext("SC_BATCH = 2; SC_RUN_START = Date.now();", ctx);
+    const run = () => {
+      vm.runInContext(
+        "SC_RUN_START = Date.now(); exportStatCounterToSheet();",
+        ctx,
+      );
+      const rows = sheets.get("pmzip_statcounter")!;
+      return rows;
+    };
+    return { urls, sheets, run, ctx };
+  }
+  const many = (n: number) =>
+    ['"Date",' + Array.from({ length: n }, (_, i) => `"V${i + 1}"`).join(",")]
+      .concat(
+        ["2025-10", "2026-10"].map((m) =>
+          [
+            m,
+            ...Array.from({ length: n }, (_, i) =>
+              (i < 2 ? 30 : 40 / (n - 2)).toFixed(2),
+            ),
+          ].join(","),
+        ),
+      )
+      .join("\n");
+
+  it("stops before the time limit, resumes next run, skips non-ISO codes", async () => {
+    const w = world("KR, US, SQ, JP, JS, DE, FR, GB, IN, BR, MX, ID", (code) =>
+      code === "BR" ? { code: 404, text: "" } : { code: 200, text: XA },
     );
-    const file = marketFileSchema.parse(JSON.parse(text));
-    expect(file.attribution).toBe("StatCounter Global Stats");
-    expect(file.notes).toEqual(["XC: HTTP 404 (건너뜀)"]);
-    expect(shareTable(file.series, "VendorA").map((r) => r.country)).toEqual([
-      "XA",
-      "XB",
-    ]);
+    let rows = w.run();
+    // 4.5 min budget, 2 min per batch → 3 batches × 2 countries.
+    expect(w.urls).toHaveLength(6);
+    const read = async (r: string[][]) =>
+      marketFileSchema.parse(
+        JSON.parse(
+          await joinSheetChunks(
+            parseCsv(
+              r.map((x) => `"${x[0].replaceAll('"', '""')}"`).join("\n"),
+            ),
+            sha256,
+            MARKET_CHUNK_HEADER,
+            "pmzip_statcounter",
+          ),
+        ),
+      );
+    let file = await read(rows);
+    expect(file.notes.join(" ")).toContain(
+      "국가 코드가 아니어서 건너뜀: SQ, JS",
+    );
+    expect(file.notes.join(" ")).toContain("4개국은 다음 실행에서 이어서");
+    expect(new Set(file.series.map((p) => p.country)).size).toBe(6);
+
+    rows = w.run(); // fetches only the remaining 4, cached ones are fresh
+    expect(w.urls).toHaveLength(10);
+    file = await read(rows);
+    expect(new Set(file.series.map((p) => p.country)).size).toBe(9);
+    expect(file.notes.join(" ")).toContain("받지 못한 국가 1개: BR(HTTP 404)");
+    expect(file.notes.join(" ")).not.toContain("다음 실행");
+    w.run(); // only the failed country is retried; fresh ones are not refetched
+    expect(w.urls).toHaveLength(11);
+    expect(new URL(w.urls[10]).searchParams.get("region_hidden")).toBe("BR");
+  });
+
+  it("keeps the top 8 vendors and sums the rest into Other (null stays null)", async () => {
+    const w = world("KR", () => ({ code: 200, text: many(12) }));
+    const rows = w.run();
+    const file = marketFileSchema.parse(
+      JSON.parse(
+        await joinSheetChunks(
+          parseCsv(
+            rows.map((x) => `"${x[0].replaceAll('"', '""')}"`).join("\n"),
+          ),
+          sha256,
+          MARKET_CHUNK_HEADER,
+          "pmzip_statcounter",
+        ),
+      ),
+    );
+    const oct = file.series.filter((p) => p.month === "2026-10");
+    expect(oct).toHaveLength(9);
+    expect(oct.at(-1)).toMatchObject({ vendor: "Other", share: 16 });
+    const total = oct.reduce((a, p) => a + (p.share ?? 0), 0);
+    expect(total).toBeCloseTo(100, 1);
   });
 });
 
