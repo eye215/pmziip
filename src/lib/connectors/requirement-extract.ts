@@ -136,6 +136,52 @@ export function cleanMessage(text: string): string {
   return out.join("\n").trim();
 }
 
+// Teams copy-paste: "이름\n오후 2:11\n메시지", "[오후 2:11] 이름\n메시지",
+// "Name, 2:11 PM\n message", plus "편집됨"/reaction noise. Headers are removed
+// and each message becomes its own block. The original text is kept elsewhere.
+const TIME =
+  "(?:(?:\\d{4}\\.\\s?\\d{1,2}\\.\\s?\\d{1,2}\\.?|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?|어제|오늘|yesterday|today|[월화수목금토일]요일|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*)\\s*)?(?:(?:오전|오후)\\s?\\d{1,2}:\\d{2}|\\d{1,2}:\\d{2}(?:\\s?[AP]M)?)";
+const TIME_ONLY = new RegExp(`^\\[?${TIME}\\]?$`, "i");
+const TIME_NAME = new RegExp(`^\\[${TIME}\\]\\s*[^:：]{1,40}$`, "i");
+const NAME_TIME = new RegExp(`^[^:：\\[,]{1,40},\\s*${TIME}$`, "i");
+const NOISE =
+  /^(편집됨|수정됨|edited|좋아요\s*\d*개?|like\s*\d*|\d+\s*(개의\s*)?(답글|회신|replies?)|답글\s*\d+개|회신\s*\d+개|has context menu|.*님이 .*(추가|제거|나갔|참가)했습니다\.?)$/i;
+
+export function isTeamsPaste(text: string): boolean {
+  let n = 0;
+  for (const l of text.split("\n")) {
+    const t = l.trim();
+    if (TIME_ONLY.test(t) || TIME_NAME.test(t) || NAME_TIME.test(t)) n++;
+  }
+  return n >= 2;
+}
+
+export function normalizeTeamsPaste(text: string): string {
+  const blocks: string[] = [];
+  let cur: string[] = [];
+  const flush = () => {
+    if (cur.length) blocks.push(cur.join("\n"));
+    cur = [];
+  };
+  for (const line of text.replace(/\r\n?/g, "\n").split("\n")) {
+    const t = line.trim();
+    if (!t || NOISE.test(t)) continue;
+    if (TIME_ONLY.test(t)) {
+      // The line just before a bare time is the sender's name.
+      if (cur.length && cur[cur.length - 1].length <= 40) cur.pop();
+      flush();
+      continue;
+    }
+    if (TIME_NAME.test(t) || NAME_TIME.test(t)) {
+      flush();
+      continue;
+    }
+    cur.push(t);
+  }
+  flush();
+  return blocks.join("\n\n");
+}
+
 /** Bullet lines and sentences; short noise is dropped. */
 export function splitUnits(text: string): string[] {
   const units: string[] = [];
@@ -160,8 +206,12 @@ export function splitUnits(text: string): string[] {
       continue;
     }
     const joined = lines.join(" ");
+    // Korean endings without punctuation only split longer text, so a short
+    // message like "다음 주까지 … 필요합니다" is not cut at "다음".
     for (const s of joined.split(
-      /(?<=[.!?。])\s+|(?<=(?:요|다|죠|음|함|됨)[.!]?)\s+(?=\S)/,
+      joined.length > 120
+        ? /(?<=[.!?。])\s+|(?<=(?:요|다|죠|음|함|됨)[.!]?)\s+(?=\S)/
+        : /(?<=[.!?。])\s+/,
     ))
       if (s.trim()) units.push(s.trim());
   }
@@ -192,7 +242,10 @@ function titleOf(unit: string) {
 
 /** Candidates in text order. Units without a matched rule are not candidates. */
 export function extractCandidates(text: string): Candidate[] {
-  const units = splitUnits(cleanMessage(text));
+  const clean = cleanMessage(text);
+  const units = splitUnits(
+    isTeamsPaste(clean) ? normalizeTeamsPaste(clean) : clean,
+  );
   const out: Candidate[] = [];
   units.forEach((unit, i) => {
     let best: { type: CandidateType; score: number } | null = null;
