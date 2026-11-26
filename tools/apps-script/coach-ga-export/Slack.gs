@@ -2,7 +2,7 @@
  * PM.zip requirement intake from Slack (read-only). Same Apps Script project.
  * - Script Properties: SLACK_BOT_TOKEN (xoxb-…, a read-only bot with
  *   channels:history, channels:read, groups:history, groups:read),
- *   SLACK_CHANNELS = "next-ai-technology-team, pj-…" (names or IDs),
+ *   channels in the sheet tab pmzip_settings ("Slack 채널") or SLACK_CHANNELS (names or IDs),
  *   optional SLACK_DAYS (default INBOX_DAYS or 30).
  * - The bot must be invited to each channel. Bot messages (e.g. stats
  *   reports) and join/leave notices are skipped. One item per top-level
@@ -45,10 +45,10 @@ function slackIsHuman_(m) {
 function slackItems_(maxItems) {
   var props = PropertiesService.getScriptProperties();
   var token = props.getProperty('SLACK_BOT_TOKEN');
-  var wanted = String(props.getProperty('SLACK_CHANNELS') || '').split(',')
+  var wanted = String(pmzipSetting_('SLACK_CHANNELS')).split(',')
     .map(function (c) { return c.trim().replace(/^#/, ''); }).filter(String);
   if (!token || !wanted.length) return { items: [], notes: [] };
-  var days = Number(props.getProperty('SLACK_DAYS') || props.getProperty('INBOX_DAYS') || 30);
+  var days = Number(props.getProperty('SLACK_DAYS') || pmzipSetting_('INBOX_DAYS') || 30);
   var oldest = String(Math.floor(Date.now() / 1000 - days * 86400));
   var team = slackApi_(token, 'auth.test', {}).url.replace(/\/$/, '');
 

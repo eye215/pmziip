@@ -104,6 +104,12 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  /** What the last sheet export searched (label or query) and when. */
+  const [sheetRun, setSheetRun] = useState<{
+    target: string;
+    at: string;
+    count: number;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const isDuplicate = (body: string, reference: string) =>
@@ -214,7 +220,13 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         "pmzip.inbox-export.chunks",
         "pmzip_inbox",
       );
-      fromExport(inboxExportSchema.parse(JSON.parse(text)));
+      const data = inboxExportSchema.parse(JSON.parse(text));
+      setSheetRun({
+        target: data.query.gmailLabel ?? "",
+        at: data.generatedAt,
+        count: data.items.length,
+      });
+      fromExport(data);
     } catch (e) {
       setMessages(null);
       setError(errorText(e));
@@ -354,7 +366,33 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                 시트에서 새 메일 확인
               </button>
             </div>
-          ) : (
+          ) : null}
+          {sheetId && sheetRun ? (
+            <p className="subtle" role="note">
+              마지막 수집:{" "}
+              {new Date(sheetRun.at).toLocaleString("ko-KR", {
+                timeZone: "Asia/Seoul",
+              })}{" "}
+              ·{" "}
+              {sheetRun.target.startsWith("query: ")
+                ? `Gmail 검색식 ${sheetRun.target.slice(7)}`
+                : `Gmail 라벨 ${sheetRun.target || "PMZIP"}`}{" "}
+              · {sheetRun.count}건
+              {sheetRun.count === 0 ? " — 가져온 메일·메시지가 없습니다." : ""}
+              <br />
+              가져올 라벨은 시트의 <strong>pmzip_settings</strong> 탭
+              &lsquo;Gmail 라벨&rsquo; 칸에 직접 입력해 바꿀 수 있습니다(쉼표로
+              여러 개). 바꾼 뒤 시트 메뉴 PM.zip &gt; 요구사항 메일 지금
+              가져오기를 누르세요.{" "}
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/edit`}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                시트 열기
+              </a>
+            </p>
+          ) : sheetId ? null : (
             <p className="empty-state">
               먼저 백업·가져오기에서 GA 시트를 연결해 주세요.
             </p>

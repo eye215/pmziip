@@ -1,12 +1,13 @@
 /**
  * "PM.zip" menu in the spreadsheet: set which Gmail labels (or a search) to
  * collect without editing Script Properties, and run the exports now.
- * Settings are stored in Script Properties (INBOX_GMAIL_LABEL, INBOX_GMAIL_QUERY,
- * INBOX_DAYS, INBOX_SHEET). Run the mail items while signed in as the mail account.
+ * Settings live in the sheet tab pmzip_settings (typed directly or via these
+ * prompts); INBOX_SHEET and the Slack token stay in Script Properties. Run the mail items while signed in as the mail account.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('PM.zip')
+    .addItem('설정 탭 열기 (라벨·기간·채널 직접 입력)', 'pmzipOpenSettings')
     .addItem('가져올 Gmail 라벨 설정', 'pmzipSetInboxLabels')
     .addItem('Gmail 검색식으로 설정 (고급)', 'pmzipSetInboxQuery')
     .addItem('메일 가져올 기간(일) 설정', 'pmzipSetInboxDays')
@@ -36,7 +37,7 @@ function pmzipLabelNames_() {
 function pmzipSetInboxLabels() {
   var ui = SpreadsheetApp.getUi();
   var props = pmzipProps_();
-  var current = props.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var current = pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
   var names = pmzipLabelNames_();
   var res = ui.prompt(
     '가져올 Gmail 라벨',
@@ -50,8 +51,8 @@ function pmzipSetInboxLabels() {
     ui.alert('라벨을 하나 이상 입력해 주세요.');
     return;
   }
-  props.setProperty('INBOX_GMAIL_LABEL', labels.join(', '));
-  props.deleteProperty('INBOX_GMAIL_QUERY'); // labels take over from an old search
+  pmzipSaveSetting_('INBOX_GMAIL_LABEL', labels.join(', '));
+  pmzipSaveSetting_('INBOX_GMAIL_QUERY', ''); // labels take over from an old search
   var missing = names.length ? labels.filter(function (l) { return names.indexOf(l) < 0; }) : [];
   ui.alert(
     '저장했습니다: ' + labels.join(', ') +
@@ -62,7 +63,7 @@ function pmzipSetInboxLabels() {
 function pmzipSetInboxQuery() {
   var ui = SpreadsheetApp.getUi();
   var props = pmzipProps_();
-  var current = props.getProperty('INBOX_GMAIL_QUERY') || '(없음 — 라벨 사용)';
+  var current = pmzipSetting_('INBOX_GMAIL_QUERY') || '(없음 — 라벨 사용)';
   var res = ui.prompt(
     'Gmail 검색식 (고급)',
     'Gmail 검색창에 쓰는 형식 그대로 입력하세요. 비우면 라벨 설정으로 돌아갑니다.\n' +
@@ -71,8 +72,7 @@ function pmzipSetInboxQuery() {
   );
   if (res.getSelectedButton() !== ui.Button.OK) return;
   var q = res.getResponseText().trim();
-  if (q) props.setProperty('INBOX_GMAIL_QUERY', q);
-  else props.deleteProperty('INBOX_GMAIL_QUERY');
+  pmzipSaveSetting_('INBOX_GMAIL_QUERY', q);
   ui.alert(q ? '검색식을 저장했습니다. 라벨 대신 이 검색식을 씁니다.' : '검색식을 지웠습니다. 라벨 설정을 씁니다.');
 }
 
@@ -81,7 +81,7 @@ function pmzipSetInboxDays() {
   var props = pmzipProps_();
   var res = ui.prompt(
     '메일 가져올 기간',
-    '최근 며칠 동안의 메일을 가져올까요? (1~365)\n현재: ' + (props.getProperty('INBOX_DAYS') || '30') + '일',
+    '최근 며칠 동안의 메일을 가져올까요? (1~365)\n현재: ' + (pmzipSetting_('INBOX_DAYS') || '30') + '일',
     ui.ButtonSet.OK_CANCEL,
   );
   if (res.getSelectedButton() !== ui.Button.OK) return;
@@ -90,7 +90,7 @@ function pmzipSetInboxDays() {
     ui.alert('1에서 365 사이의 숫자를 입력해 주세요.');
     return;
   }
-  props.setProperty('INBOX_DAYS', String(Math.round(n)));
+  pmzipSaveSetting_('INBOX_DAYS', String(Math.round(n)));
   ui.alert('저장했습니다: 최근 ' + Math.round(n) + '일');
 }
 
@@ -101,14 +101,13 @@ function pmzipSetSlackChannels() {
     'Slack 채널',
     '수집할 채널 이름을 쉼표로 입력하세요. 예: next-ai-technology-team, pj-넥삼플-운영dev\n' +
       '봇을 각 채널에 /invite 해야 합니다. 토큰(SLACK_BOT_TOKEN)은 스크립트 속성에 넣으세요.\n현재: ' +
-      (props.getProperty('SLACK_CHANNELS') || '없음') +
+      (pmzipSetting_('SLACK_CHANNELS') || '없음') +
       ' · 토큰 ' + (props.getProperty('SLACK_BOT_TOKEN') ? '설정됨' : '없음'),
     ui.ButtonSet.OK_CANCEL,
   );
   if (res.getSelectedButton() !== ui.Button.OK) return;
   var channels = res.getResponseText().split(',').map(function (s) { return s.trim().replace(/^#/, ''); }).filter(String);
-  if (channels.length) props.setProperty('SLACK_CHANNELS', channels.join(', '));
-  else props.deleteProperty('SLACK_CHANNELS');
+  pmzipSaveSetting_('SLACK_CHANNELS', channels.join(', '));
   ui.alert(channels.length ? '저장했습니다: ' + channels.join(', ') : 'Slack 수집을 껐습니다.');
 }
 
@@ -144,16 +143,23 @@ function pmzipInstallInboxTrigger() {
   ui.alert('매일 07시대에 지금 이 계정의 메일을 가져오도록 설정했습니다. 메일을 읽을 계정으로 로그인한 상태에서 눌러야 합니다.');
 }
 
+/** Shows (creating if needed) the pmzip_settings tab where values are typed directly. */
+function pmzipOpenSettings() {
+  var sh = pmzipEnsureSettingsSheet_();
+  sh.activate();
+  sh.getRange(2, 2).activate();
+}
+
 function pmzipShowSettings() {
   var p = pmzipProps_();
-  var q = p.getProperty('INBOX_GMAIL_QUERY');
+  var q = pmzipSetting_('INBOX_GMAIL_QUERY');
   SpreadsheetApp.getUi().alert(
     'PM.zip 설정\n\n' +
-      '메일 대상: ' + (q ? '검색식 ' + q : '라벨 ' + (p.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP')) + '\n' +
-      '기간: 최근 ' + (p.getProperty('INBOX_DAYS') || '30') + '일\n' +
-      '캘린더: 최근 ' + (p.getProperty('INBOX_CALENDAR_DAYS') || '14') + '일 (0이면 끔)\n' +
+      '메일 대상: ' + (q ? '검색식 ' + q : '라벨 ' + (pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP')) + '\n' +
+      '기간: 최근 ' + (pmzipSetting_('INBOX_DAYS') || '30') + '일\n' +
+      '캘린더: 최근 ' + (pmzipSetting_('INBOX_CALENDAR_DAYS') || '14') + '일 (0이면 끔)\n' +
       '공유 시트 기록: ' + (p.getProperty('INBOX_SHEET') === 'on' ? '켜짐' : '꺼짐') + '\n' +
-      'Slack 채널: ' + (p.getProperty('SLACK_CHANNELS') || '없음') +
+      'Slack 채널: ' + (pmzipSetting_('SLACK_CHANNELS') || '없음') +
         ' (토큰 ' + (p.getProperty('SLACK_BOT_TOKEN') ? '설정됨' : '없음') + ')\n' +
       'DART 회사: ' + (p.getProperty('DART_CORP_CODE') || '미설정') + '\n' +
       'StatCounter 국가: ' + (p.getProperty('STATCOUNTER_COUNTRIES')

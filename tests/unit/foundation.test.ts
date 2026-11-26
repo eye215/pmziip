@@ -8,10 +8,18 @@ describe("synthetic foundation (not production authorization)", () => {
   it("has synthetic Coach/Survey and independent projects with stable UUIDs", () => {
     const data = workspaceSchema.parse(demoWorkspace);
     expect(data.mode).toBe("synthetic");
-    expect(data.projects.map(p => p.kind)).toEqual(["coach", "survey", "independent"]);
+    expect(data.projects.map((p) => p.kind)).toEqual([
+      "coach",
+      "survey",
+      "independent",
+    ]);
     expect(data.projects[0].id).not.toBe(data.projects[1].id);
-    expect(listProjects(data, { clientId: data.clients[0].id })).toHaveLength(2);
-    expect(listProjects(data, { projectId: data.projects[1].id })).toEqual([data.projects[1]]);
+    expect(listProjects(data, { clientId: data.clients[0].id })).toHaveLength(
+      2,
+    );
+    expect(listProjects(data, { projectId: data.projects[1].id })).toEqual([
+      data.projects[1],
+    ]);
     expect(listProjects(data, { projectId: "missing" })).toEqual([]);
   });
   it("rejects duplicate IDs and cross-workspace/group relationships", () => {
@@ -31,7 +39,9 @@ describe("synthetic foundation (not production authorization)", () => {
     expect(demoWorkspace).toEqual(before);
     const renamed = structuredClone(demoWorkspace);
     renamed.projects[0].name = "Renamed demo";
-    expect(listProjects(renamed, { projectId: renamed.projects[0].id })[0].id).toBe(before.projects[0].id);
+    expect(
+      listProjects(renamed, { projectId: renamed.projects[0].id })[0].id,
+    ).toBe(before.projects[0].id);
   });
 });
 
@@ -57,9 +67,17 @@ describe("Galaxy Coach v1.2 metric definition (no API adapter yet)", () => {
     expect(coachDefinition.done.eventName).toBe("GALAXY_COACH_REPORT");
     expect(coachDefinition.done.metrics).toEqual(["totalUsers", "eventCount"]);
     expect(coachDefinition.score.eventName).toBe("GALAXY_COACH_REPORT");
-    expect(coachDefinition.score.allowedValues).toEqual(["1", "2", "3", "4", "5"]);
+    expect(coachDefinition.score.allowedValues).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+    ]);
     expect(coachDefinition.doneCountSource).toBe("reportEventCount");
     expect(coachDefinition.validScoreCountSource).toBe("scoreEventCount");
-    expect(coachDefinition.uniqueUsersPolicy).toBe("query-period-total-separately");
+    expect(coachDefinition.uniqueUsersPolicy).toBe(
+      "query-period-total-separately",
+    );
   });
 });
