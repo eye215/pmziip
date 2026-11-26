@@ -71,10 +71,13 @@ export async function joinSheetChunks(
 ): Promise<string> {
   const cells = rows.map((r) => r[0] ?? "").filter((c) => c !== "");
   const header = cells[0]?.split("|") ?? [];
-  if (header[0] !== expectedHeader || header[1] !== "v1")
+  if (header[0] !== expectedHeader || header[1] !== "v1") {
+    // Google returns the FIRST tab when the requested tab does not exist.
+    const first = (cells[0] ?? "").replace(/\s+/g, " ").slice(0, 40);
     throw new Error(
-      `시트의 ${tab} 탭이 PM.zip 내보내기 형식이 아닙니다. 공유 설정과 탭 이름을 확인해 주세요.`,
+      `시트에 ${tab} 탭이 없거나 PM.zip 내보내기 형식이 아닙니다. Apps Script에서 내보내기 함수를 실행했는지, 탭 이름이 정확히 ${tab}인지 확인해 주세요. (읽힌 첫 칸: ${first ? `"${first}${(cells[0] ?? "").length > 40 ? "…" : ""}"` : "비어 있음"}, 기대: "${expectedHeader}|v1|…")`,
     );
+  }
   const expected = Number(header[2]);
   const chunks = cells.slice(1);
   if (!Number.isInteger(expected) || chunks.length !== expected)
