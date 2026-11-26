@@ -1012,11 +1012,6 @@ function InitiativeEditor({ state, editor, close }: Props) {
         change={(alternative) => setData({ ...data, alternative })}
         area
       />
-      <SourceChoices
-        sources={state.sources}
-        ids={sourceIds}
-        change={setSourceIds}
-      />
       <fieldset className="case-fields">
         <legend>케이스 스터디 (선택)</legend>
         <p className="subtle">
@@ -1102,6 +1097,11 @@ function InitiativeEditor({ state, editor, close }: Props) {
           area
         />
       </fieldset>
+      <SourceChoices
+        sources={state.sources}
+        ids={sourceIds}
+        change={setSourceIds}
+      />
       <p className="subtle">
         측정 준비 상태는 업무 상태와 별개입니다. 과제의 ‘측정 계획’에서 지표와
         준비 상태를 관리할 수 있습니다.
