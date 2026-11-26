@@ -5,6 +5,7 @@ import { projectMonth } from "../../lib/time";
 import { MeasurementWorkspace } from "../measurement/workspace";
 import { readiness } from "../measurement/model";
 import { SourceSplitReview } from "../measurement/source-split";
+import { CoachDataPanel } from "../coach-data/panel";
 import {
   useRecords,
   useView,
@@ -827,6 +828,9 @@ export function WorkspaceApp() {
                   ))}
                 </details>
               </section>
+            )}
+            {tab === "data" && (
+              <CoachDataPanel projects={state.workspace.projects} />
             )}
             <footer>
               합성 로컬 워크스페이스 · 실제 로그인·운영 DB·외부 수집 미연결 ·
