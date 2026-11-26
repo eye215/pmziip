@@ -1,0 +1,378 @@
+[
+  {
+    "id": "F01",
+    "phase": 1,
+    "tests": [
+      "T01",
+      "T15",
+      "T18"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F02",
+    "phase": 1,
+    "tests": [
+      "T02"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F03",
+    "phase": 1,
+    "tests": [
+      "T02",
+      "T19"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F04",
+    "phase": 1,
+    "tests": [
+      "T02"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F05",
+    "phase": 2,
+    "tests": [
+      "T03"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F06",
+    "phase": 2,
+    "tests": [
+      "T03",
+      "T05"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F07",
+    "phase": 2,
+    "tests": [
+      "T05"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F08",
+    "phase": 2,
+    "tests": [
+      "T04"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F09",
+    "phase": 2,
+    "tests": [
+      "T09"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F10",
+    "phase": 3,
+    "tests": [
+      "T11",
+      "T13",
+      "T21",
+      "T22"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F11",
+    "phase": 3,
+    "tests": [
+      "T23"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F12",
+    "phase": 3,
+    "tests": [
+      "T06",
+      "T10",
+      "T16"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F13",
+    "phase": 3,
+    "tests": [
+      "T06",
+      "T07",
+      "T08",
+      "T12"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F14",
+    "phase": 4,
+    "tests": [
+      "T07",
+      "T09",
+      "T28"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F15",
+    "phase": 5,
+    "tests": [
+      "T11",
+      "T20",
+      "T25"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F16",
+    "phase": 5,
+    "tests": [
+      "T14",
+      "T26"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F17",
+    "phase": 1,
+    "tests": [
+      "T17"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F18",
+    "phase": 1,
+    "tests": [
+      "T01",
+      "T16",
+      "T27"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F19",
+    "phase": 1,
+    "tests": [
+      "T18",
+      "T27"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F20",
+    "phase": 1,
+    "tests": [
+      "T19"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F21",
+    "phase": 1,
+    "tests": [
+      "T20"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F22",
+    "phase": 3,
+    "tests": [
+      "T21",
+      "T22"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F23",
+    "phase": 4,
+    "tests": [
+      "T23"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F24",
+    "phase": 3,
+    "tests": [
+      "T21",
+      "T22",
+      "T28"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F25",
+    "phase": 5,
+    "tests": [
+      "T25"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F26",
+    "phase": 5,
+    "tests": [
+      "T26"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F27",
+    "phase": 4,
+    "tests": [
+      "T24"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F28",
+    "phase": 4,
+    "tests": [
+      "T09",
+      "T28"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F29",
+    "phase": 7,
+    "tests": [
+      "T29"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F30",
+    "phase": 3,
+    "tests": [
+      "T30"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F31",
+    "phase": 3,
+    "tests": [
+      "T31"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F32",
+    "phase": 3,
+    "tests": [
+      "T32"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F33",
+    "phase": 7,
+    "tests": [
+      "T33"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F34",
+    "phase": 2,
+    "tests": [
+      "T34"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F35",
+    "phase": 2,
+    "tests": [
+      "T35"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F36",
+    "phase": 6,
+    "tests": [
+      "T36"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F37",
+    "phase": 5,
+    "tests": [
+      "T37"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F38",
+    "phase": 6,
+    "tests": [
+      "T38"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F39",
+    "phase": 6,
+    "tests": [
+      "T39"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F40",
+    "phase": 7,
+    "tests": [
+      "T40"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F41",
+    "phase": 7,
+    "tests": [
+      "T41"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F42",
+    "phase": 4,
+    "tests": [
+      "T42"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F43",
+    "phase": 5,
+    "tests": [
+      "T43"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "F44",
+    "phase": 1,
+    "tests": [
+      "T44"
+    ],
+    "status": "planned"
+  }
+]

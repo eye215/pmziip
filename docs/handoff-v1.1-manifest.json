@@ -1,0 +1,42 @@
+[
+  {
+    "path": "AGENTS.md",
+    "sha256": "93e9849bdf186e0ae2b1a33a9ff21d0d66a59b8fd71f66bc2fe8273d8cad87a9"
+  },
+  {
+    "path": "CLAUDE.md",
+    "sha256": "799ef6083ef168bda1f9de76d195ee0409f61b83f0914167da7f4014bae3f2d6"
+  },
+  {
+    "path": "README.md",
+    "sha256": "14e80827210a8c1d0e5647a45df3dd7475323fff7d39d1c798722f866583e7ff"
+  },
+  {
+    "path": "START-PROMPT.md",
+    "sha256": "5b0dea96dbe072e7fdf2818a62aea6cec2682e752b3ca64bf4394028444c0fb2"
+  },
+  {
+    "path": "docs/01-PRD.md",
+    "sha256": "dbf96d1135305b15f4b0b472b891274d1c3f3ca16d1c4e1ea2f058efe46aede0"
+  },
+  {
+    "path": "docs/02-FRD.md",
+    "sha256": "cdf9797420072a2d12c23a936e9a42873e08d41e0ae22df2f49fa224b531bc23"
+  },
+  {
+    "path": "docs/03-architecture.md",
+    "sha256": "9638f13d4dd88790dfa798753d0c18ce797eededcdfbadff132c1e2b6805ab6f"
+  },
+  {
+    "path": "docs/04-phases.md",
+    "sha256": "5e80da01a1d8c728a1a7dc218c6f680bfcacd00392066475d30bb02c59ad7b43"
+  },
+  {
+    "path": "docs/05-tests.md",
+    "sha256": "3a019ff6c0008e3ea318fb089d1b1ef68e2204c97b28c66620124c87ec447094"
+  },
+  {
+    "path": "reference/pmzip.html",
+    "sha256": "d0120b15d3c1024b4ada99413a8a8d4a1e9e79ee47c0884a4204a68b9722d58f"
+  }
+]
