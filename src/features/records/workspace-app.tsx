@@ -12,6 +12,7 @@ import { MarketSharePanel } from "../market-share/panel";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
+import { ConnectionStatus } from "./connection-status";
 import { ReportPanel } from "../report/panel";
 import { HomeFlow } from "../report/home-flow";
 import {
@@ -823,6 +824,18 @@ export function WorkspaceApp() {
                 navigate={navigate}
               />
             )}
+            <DeviceLinkHandler projects={state.workspace.projects} />
+            {tab === "data" && <ConnectionStatus />}
+            {tab === "data" && <DeviceLinkPanel />}
+            {tab === "data" && (
+              <CoachDataPanel projects={state.workspace.projects} />
+            )}
+            {tab === "data" && <PublicFinancialsPanel />}
+            {tab === "perf" && <ReportPanel state={state} />}
+            {tab === "perf" && (
+              <PerformanceView projects={state.workspace.projects} />
+            )}
+            {tab === "data" && <MarketSharePanel />}
             {tab === "data" && (
               <section className="panel">
                 <h2>기록 백업</h2>
@@ -872,17 +885,6 @@ export function WorkspaceApp() {
                 </details>
               </section>
             )}
-            <DeviceLinkHandler projects={state.workspace.projects} />
-            {tab === "data" && <DeviceLinkPanel />}
-            {tab === "data" && (
-              <CoachDataPanel projects={state.workspace.projects} />
-            )}
-            {tab === "data" && <PublicFinancialsPanel />}
-            {tab === "perf" && <ReportPanel state={state} />}
-            {tab === "perf" && (
-              <PerformanceView projects={state.workspace.projects} />
-            )}
-            {tab === "data" && <MarketSharePanel />}
             <footer>
               합성 로컬 워크스페이스 · 실제 로그인·운영 DB·외부 수집 미연결 ·
               중요한 입력 전후로 백업해 주세요.

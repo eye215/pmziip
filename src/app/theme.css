@@ -343,3 +343,120 @@ details > summary {
   color: #fff;
   font-variant-numeric: tabular-nums;
 }
+
+/* Settings: connection state */
+.conn-status ul {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.panel .conn-status ul,
+.conn-status ul {
+  font-size: 14px;
+}
+.conn-status li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.conn-status li:last-child {
+  border-bottom: 0;
+}
+.conn-status li strong {
+  width: auto;
+  color: var(--ink);
+  font-weight: 700;
+}
+.conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--line);
+}
+.conn-ok {
+  background: var(--st-release);
+}
+.conn-warn {
+  background: var(--st-change);
+}
+
+/* 수집함: segmented source picker, candidate cards, sticky register bar */
+.intake .segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px;
+  background: var(--sunken);
+  border-radius: 999px;
+}
+.intake .segmented button {
+  background: transparent;
+  min-height: 44px;
+}
+.intake .segmented button[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.intake-review {
+  border-top: 0;
+}
+.intake-review > article.record-row {
+  background: var(--surface);
+  border: 0;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.intake-candidates li {
+  border: 0;
+  border-radius: 12px;
+  background: var(--sunken);
+}
+.intake-type {
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: #e7f2fe;
+  color: #1f6fbf;
+}
+.intake-bug {
+  background: #fde8e6;
+  color: #b4362b;
+}
+.intake-change {
+  background: #fcf1e1;
+  color: #9a6512;
+}
+.intake-decision {
+  background: #efebfe;
+  color: #5b45c9;
+}
+.intake-question {
+  background: var(--sunken);
+  color: var(--body);
+}
+.intake-submit {
+  position: sticky;
+  bottom: 16px;
+  z-index: 2;
+  padding: 10px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-float);
+}
+.intake-submit button {
+  flex: 1;
+}
+@media (max-width: 700px) {
+  .intake-submit {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}

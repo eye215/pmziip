@@ -645,7 +645,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
               </select>
             </div>
           )}
-          <div className="actions">
+          <div className="actions intake-submit">
             <button
               type="button"
               className="primary"
