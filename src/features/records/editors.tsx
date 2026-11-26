@@ -924,8 +924,8 @@ function InitiativeEditor({ state, editor, close }: Props) {
         change={setSourceIds}
       />
       <p className="subtle">
-        측정 준비 상태는 업무 상태와 별개입니다. 측정 계획은 다음 단계에서
-        작성합니다.
+        측정 준비 상태는 업무 상태와 별개입니다. 과제의 ‘측정 계획’에서 지표와
+        준비 상태를 관리할 수 있습니다.
       </p>
     </Frame>
   );
