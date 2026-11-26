@@ -183,9 +183,11 @@ describe("Apps Script exporter (Code.gs) ↔ PM.zip contract", () => {
       c.slice(0, 5) + (c[5] === "x" ? "y" : "x") + c.slice(6);
     const tampered = rows.map((r, i) => (i === 1 ? [flip(r[0])] : r));
     await expect(joinSheetChunks(tampered, sha256)).rejects.toThrow("검증값");
+    // Missing tab: Google returns the first tab instead → explain and show it.
     await expect(joinSheetChunks([["이름", "값"]], sha256)).rejects.toThrow(
-      "형식",
+      '시트에 pmzip_export 탭이 없거나 PM.zip 내보내기 형식이 아닙니다. Apps Script에서 내보내기 함수를 실행했는지, 탭 이름이 정확히 pmzip_export인지 확인해 주세요. (읽힌 첫 칸: "이름"',
     );
+    await expect(joinSheetChunks([], sha256)).rejects.toThrow("비어 있음");
   });
 });
 

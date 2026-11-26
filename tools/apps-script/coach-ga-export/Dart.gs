@@ -154,26 +154,39 @@ function writeDartSummary_(sheet, data) {
 }
 
 /**
- * Helper (run once from the editor): finds the 8-digit DART 고유번호 for a
- * 6-digit stock code using the official corpCode.zip, and logs it.
- * Usage: set STOCK below or Script Property DART_STOCK_CODE, then run.
+ * Helper (run once from the editor): finds the 8-digit DART 고유번호 for
+ * 6-digit stock codes in Script Property DART_STOCK_CODE (comma-separated).
+ * DART serves corpCode.zip without an application/zip content type, so the
+ * blob is checked for the zip signature and retyped before unzipping.
  */
 function findDartCorpCode() {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('DART_API_KEY');
-  var stock = props.getProperty('DART_STOCK_CODE');
-  var stocks = String(stock || '').split(',').map(function (x) { return x.trim(); }).filter(String);
+  var stocks = String(props.getProperty('DART_STOCK_CODE') || '').split(',')
+    .map(function (x) { return x.trim(); }).filter(String);
   if (!key || !stocks.length || stocks.some(function (x) { return !/^\d{6}$/.test(x); }))
     throw new Error('DART_API_KEY와 DART_STOCK_CODE(6자리 종목코드, 여러 개면 쉼표)를 설정해 주세요.');
-  var res = UrlFetchApp.fetch('https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=' + encodeURIComponent(key), { muteHttpExceptions: true });
+  Logger.log('1/3 DART 고유번호 파일 받는 중… (1~4분 걸릴 수 있음)');
+  var res = UrlFetchApp.fetch('https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=' +
+    encodeURIComponent(key), { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) throw new Error('DART HTTP ' + res.getResponseCode());
-  var xml = Utilities.unzip(res.getBlob())[0].getDataAsString('UTF-8');
+  var blob = res.getBlob();
+  var head = blob.getBytes().slice(0, 2);
+  if (!(head[0] === 0x50 && head[1] === 0x4b)) {
+    // Not a zip (PK…): DART sent an error message instead (e.g. wrong key).
+    throw new Error('DART 오류 응답: ' + res.getContentText('UTF-8').slice(0, 300));
+  }
+  Logger.log('2/3 압축 해제 중…');
+  var xml = Utilities.unzip(blob.setContentType('application/zip'))[0].getDataAsString('UTF-8');
+  Logger.log('3/3 종목코드 찾는 중…');
   var codes = stocks.map(function (code) {
-    var re = new RegExp('<corp_code>(\\d{8})</corp_code>\\s*<corp_name>([^<]*)</corp_name>(?:\\s*<corp_eng_name>[^<]*</corp_eng_name>)?\\s*<stock_code>' + code + '</stock_code>');
-    var m = xml.match(re);
-    if (!m) throw new Error('종목코드 ' + code + '에 해당하는 고유번호를 찾지 못했습니다.');
-    Logger.log(code + ' → 고유번호 ' + m[1] + ' (' + m[2] + ')');
-    return m[1];
+    var at = xml.indexOf('<stock_code>' + code + '</stock_code>');
+    if (at < 0) throw new Error('종목코드 ' + code + '에 해당하는 고유번호를 찾지 못했습니다.');
+    var start = xml.lastIndexOf('<corp_code>', at);
+    var corp = xml.substr(start + 11, 8);
+    var name = xml.slice(xml.indexOf('<corp_name>', start) + 11, xml.indexOf('</corp_name>', start));
+    Logger.log(code + ' → 고유번호 ' + corp + ' (' + name + ')');
+    return corp;
   });
   Logger.log('DART_CORP_CODE에 넣을 값: ' + codes.join(','));
   return codes.join(',');
