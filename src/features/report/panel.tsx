@@ -45,6 +45,19 @@ export function observeFor(state: RecordsState) {
 function ReportBody({ r }: { r: ReportContent }) {
   return (
     <>
+      <div className="report-hero">
+        <p className="report-hero-k">횟수 완료율 상승이 관찰된 배포</p>
+        <p className="report-hero-v">
+          {r.summary.comparable
+            ? `${r.summary.improvedObserved} / ${r.summary.comparable}`
+            : "N/A"}
+        </p>
+        <p className="report-hero-s">
+          {r.summary.comparable
+            ? `전후 비교 가능한 배포 ${r.summary.comparable}건 중 · 관찰값`
+            : "전후 비교 가능한 배포가 없습니다"}
+        </p>
+      </div>
       <ol className="report-funnel" aria-label="흐름">
         {(
           [

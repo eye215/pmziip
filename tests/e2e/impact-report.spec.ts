@@ -43,6 +43,8 @@ test("impact report: period draft, finalize once as a snapshot, survives reload"
     has: page.getByText("배포", { exact: true }),
   });
   await expect(released.locator("dd")).toHaveText("1");
+  // No GA comparison yet: the ratio is N/A, never 0 / 0.
+  await expect(panel.locator(".report-hero-v").first()).toHaveText("N/A");
   await expect(
     panel
       .getByRole("list", { name: "흐름" })
