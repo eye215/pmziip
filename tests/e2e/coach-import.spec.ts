@@ -345,6 +345,10 @@ test("StatCounter CSV upload: share table with year-ago change and same-month Co
   await panel.getByRole("button", { name: "GA 파일 미리보기" }).click();
   await panel.getByLabel("기간·조회 정의·품질 경고를 확인했습니다").check();
   await panel.getByRole("button", { name: "GA 기간 저장" }).click();
+  // Navigate only after the save finished (otherwise it can be interrupted).
+  await expect(
+    panel.getByText("GA 기간 2개를 저장했습니다. 중복 0개는 제외했습니다."),
+  ).toBeVisible();
   await openPanel(page);
 
   const market = page.getByRole("region", {
