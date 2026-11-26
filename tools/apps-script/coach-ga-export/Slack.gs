@@ -13,18 +13,33 @@
  */
 var SLACK_MAX_THREADS = 60;
 
+var SLACK_RETRY_BUDGET_MS = 90000; // total wait for 429 retries in one run
+var slackWaitedMs_ = 0;
+var slackChannelCache_ = null; // one conversations.list sweep per run
+
 function slackApi_(token, method, params) {
   var qs = Object.keys(params || {}).map(function (k) {
     return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
   }).join('&');
-  var res = UrlFetchApp.fetch('https://slack.com/api/' + method + (qs ? '?' + qs : ''), {
-    headers: { Authorization: 'Bearer ' + token },
-    muteHttpExceptions: true,
-  });
-  if (res.getResponseCode() === 429) throw new Error('Slack 요청 한도 초과입니다. 잠시 후 다시 실행해 주세요.');
-  var body = JSON.parse(res.getContentText());
-  if (!body.ok) throw new Error('Slack ' + method + ': ' + body.error);
-  return body;
+  for (var attempt = 0; ; attempt++) {
+    var res = UrlFetchApp.fetch('https://slack.com/api/' + method + (qs ? '?' + qs : ''), {
+      headers: { Authorization: 'Bearer ' + token },
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() === 429) {
+      // Wait as Slack asks (Retry-After seconds), within the run's budget.
+      var headers = (res.getHeaders && res.getHeaders()) || {};
+      var wait = (Number(headers['Retry-After'] || headers['retry-after']) || 30) * 1000 + 500;
+      if (attempt >= 4 || slackWaitedMs_ + wait > SLACK_RETRY_BUDGET_MS)
+        throw new Error('Slack 요청 한도 초과입니다(' + method + '). 몇 분 뒤 다시 실행해 주세요.');
+      slackWaitedMs_ += wait;
+      Utilities.sleep(wait);
+      continue;
+    }
+    var body = JSON.parse(res.getContentText());
+    if (!body.ok) throw new Error('Slack ' + method + ': ' + body.error);
+    return body;
+  }
 }
 
 /** "<@U1>" → "@사용자", "<#C1|name>" → "#name", "<url|text>" → "text (url)". */
@@ -53,16 +68,9 @@ function slackItems_(maxItems) {
   var oldest = String(Math.floor(Date.now() / 1000 - days * 86400));
   var team = slackApi_(token, 'auth.test', {}).url.replace(/\/$/, '');
 
-  // Resolve names → IDs (IDs pass through).
+  // Resolve names → IDs (IDs pass through), reusing this run's channel list.
   var byName = {};
-  var cursor = '';
-  do {
-    var page = slackApi_(token, 'conversations.list', {
-      types: 'public_channel,private_channel', exclude_archived: 'true', limit: '200', cursor: cursor,
-    });
-    page.channels.forEach(function (c) { byName[c.name] = c.id; byName[c.id] = c.id; });
-    cursor = (page.response_metadata && page.response_metadata.next_cursor) || '';
-  } while (cursor);
+  slackChannelList_(token).forEach(function (c) { byName[c.name] = c.id; byName[c.id] = c.id; });
 
   var items = [];
   var notes = [];
@@ -74,15 +82,27 @@ function slackItems_(maxItems) {
       return;
     }
     var label = /^[CG][A-Z0-9]+$/.test(name) ? id : name;
-    var hist = slackApi_(token, 'conversations.history', { channel: id, oldest: oldest, limit: '200' });
+    var hist;
+    try {
+      hist = slackApi_(token, 'conversations.history', { channel: id, oldest: oldest, limit: '200' });
+    } catch (e) {
+      // One channel's error (e.g. bot not invited) does not stop the others.
+      var why = String(e && e.message || e);
+      notes.push(/not_in_channel/.test(why) ? '봇 초대 필요: #' + label : '#' + label + ' 읽기 실패 — ' + why);
+      return;
+    }
     hist.messages.filter(slackIsHuman_).forEach(function (m) {
       if (items.length >= maxItems) return;
       var text = slackText_(m.text);
       if (m.reply_count && threads < SLACK_MAX_THREADS) {
         threads++;
-        var rep = slackApi_(token, 'conversations.replies', { channel: id, ts: m.ts, limit: '100' });
-        var replies = rep.messages.slice(1).filter(slackIsHuman_).map(function (r) { return slackText_(r.text); });
-        if (replies.length) text += '\n\n' + replies.join('\n');
+        try {
+          var rep = slackApi_(token, 'conversations.replies', { channel: id, ts: m.ts, limit: '100' });
+          var replies = rep.messages.slice(1).filter(slackIsHuman_).map(function (r) { return slackText_(r.text); });
+          if (replies.length) text += '\n\n' + replies.join('\n');
+        } catch (e) {
+          // Keep the parent message without its replies.
+        }
       }
       if (!text.trim()) return;
       var first = text.split('\n')[0].trim();
@@ -102,11 +122,12 @@ function slackItems_(maxItems) {
 
 /** Channels the bot can see: [{name, id, member}], members first, then by name. */
 function slackChannelList_(token) {
+  if (slackChannelCache_ && slackChannelCache_.token === token) return slackChannelCache_.list.slice();
   var out = [];
   var cursor = '';
   do {
     var page = slackApi_(token, 'conversations.list', {
-      types: 'public_channel,private_channel', exclude_archived: 'true', limit: '200', cursor: cursor,
+      types: 'public_channel,private_channel', exclude_archived: 'true', limit: '1000', cursor: cursor,
     });
     page.channels.forEach(function (c) { out.push({ name: c.name, id: c.id, member: !!c.is_member }); });
     cursor = (page.response_metadata && page.response_metadata.next_cursor) || '';
@@ -114,7 +135,8 @@ function slackChannelList_(token) {
   out.sort(function (a, b) {
     return a.member !== b.member ? (a.member ? -1 : 1) : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
-  return out;
+  slackChannelCache_ = { token: token, list: out };
+  return out.slice();
 }
 
 /**

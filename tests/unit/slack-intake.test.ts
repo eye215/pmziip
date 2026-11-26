@@ -276,4 +276,50 @@ describe("Slack.gs intake", () => {
       vm.runInContext('pmzipSaveSlackPick(["없는채널"], false)', w.ctx),
     ).toThrow("하나 이상");
   });
+  it("waits on 429 (Retry-After), lists channels once per run, and notes channels the bot is not in", () => {
+    const w = world({
+      SLACK_BOT_TOKEN: TOKEN,
+      SLACK_CHANNELS: "pj-coach, next-ai-team",
+      INBOX_SHEET: "on",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    const slept: number[] = [];
+    (w.ctx.Utilities as Record<string, unknown>).sleep = (ms: number) =>
+      void slept.push(ms);
+    const urls: string[] = [];
+    let limited = false;
+    (w.ctx.UrlFetchApp as { fetch: unknown }).fetch = (url: string) => {
+      urls.push(url);
+      const u = new URL(url);
+      if (u.pathname.endsWith("conversations.history") && !limited) {
+        limited = true;
+        return {
+          getResponseCode: () => 429,
+          getHeaders: () => ({ "Retry-After": "2" }),
+          getContentText: () => "",
+        };
+      }
+      const body =
+        u.pathname.endsWith("conversations.history") &&
+        u.searchParams.get("channel") === "G0002"
+          ? { ok: false, error: "not_in_channel" }
+          : slack(url);
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify(body),
+      };
+    };
+    const status = vm.runInContext("exportInboxToSheet()", w.ctx);
+    expect(slept).toEqual([2500]);
+    expect(status).toBe(
+      "Gmail 0건 (라벨 PMZIP, 최근 30일) · 캘린더 끔 · Slack 1건 — 봇 초대 필요: #next-ai-team",
+    );
+    // Two list pages, fetched once for both the checkbox list and reading.
+    expect(urls.filter((x) => x.includes("conversations.list"))).toHaveLength(
+      2,
+    );
+    expect(urls.find((x) => x.includes("conversations.list"))).toContain(
+      "limit=1000",
+    );
+  });
 });
