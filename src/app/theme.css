@@ -805,3 +805,41 @@ details > summary {
     margin-bottom: 14px;
   }
 }
+
+/* Work: status chips (mock m3) */
+.status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.status-chips button {
+  flex: none;
+  min-height: 44px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.status-chips button[aria-pressed="true"] {
+  background: var(--ink);
+  box-shadow: none;
+}
+.chip-n {
+  font-weight: 600;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile: paired fields side by side (mock m3/m4) */
+@media (max-width: 560px) {
+  .work-filters,
+  .report-panel .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}

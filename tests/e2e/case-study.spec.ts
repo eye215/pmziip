@@ -84,6 +84,15 @@ test("case study fields save on the initiative and show as eight lines", async (
   await expect(
     card.getByRole("list", { name: "진행 단계: 배포" }),
   ).toBeVisible();
+  // Status chips filter the list and toggle back to all.
+  const chips = page.getByRole("group", { name: "상태 빠른 선택" });
+  await chips.getByRole("button", { name: /^결정 대기/ }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByLabel("상태", { exact: true })).toHaveValue("draft");
+  await chips.getByRole("button", { name: /^배포 \d+$/ }).click();
+  await expect(card).toHaveCount(1);
+  await chips.getByRole("button", { name: /^전체/ }).click();
+  await expect(page.getByLabel("상태", { exact: true })).toHaveValue("");
   await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
   const steps = card.getByRole("list", { name: "단계별 기록" });
   await expect(steps.getByRole("listitem")).toHaveCount(5);
