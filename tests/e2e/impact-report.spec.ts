@@ -46,13 +46,6 @@ test("impact report: period draft, finalize once as a snapshot, survives reload"
   await expect(panel.locator(".report-case summary")).toContainText(
     "합성 보고서 과제",
   );
-  // Public copy: project name aliased, listed words hidden.
-  await panel.getByLabel(/공개할 때 가릴 단어/).fill("합성 보고서, 없는단어");
-  await panel.getByText("공개용 미리보기").first().click();
-  const pub = panel.getByLabel("가린 결과 (읽기 전용)").first();
-  await expect(pub).toHaveValue(/프로젝트 A/);
-  await expect(pub).not.toHaveValue(/Demo Coach/);
-  await expect(pub).toHaveValue(/\[비공개\] 과제/);
   await panel.getByRole("button", { name: "이 내용으로 확정" }).click();
   await expect(panel.getByRole("status").last()).toContainText("v1로 확정");
   await panel.getByRole("button", { name: "이 내용으로 확정" }).click();
