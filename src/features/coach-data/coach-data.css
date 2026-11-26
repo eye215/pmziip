@@ -75,3 +75,6 @@
   margin-top: 10px;
   overflow-wrap: anywhere;
 }
+.coach-card-metrics dt {
+  overflow-wrap: anywhere;
+}

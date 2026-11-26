@@ -49,17 +49,7 @@ function text(v: MetricValue, kind: "percent" | "decimal") {
   return kind === "percent" ? percent.format(v.value) : decimal.format(v.value);
 }
 
-/**
- * Coach project card metrics from imported GA periods. Without imported data
- * the card keeps the original "미수집" values.
- */
-export function CoachProjectMetrics({
-  projectId,
-  labels,
-}: {
-  projectId: string;
-  labels: readonly string[];
-}) {
+function useCoachSnapshots(projectId: string) {
   const [list, setList] = useState(() => readSnapshots(projectId));
   useEffect(() => {
     const refresh = (e: StorageEvent) => {
@@ -75,29 +65,62 @@ export function CoachProjectMetrics({
       window.removeEventListener("pmzip:view", onView);
     };
   }, [projectId]);
-  const snap = cardPeriod(list);
+  return list;
+}
+
+/**
+ * Coach project card metrics from imported GA periods: completion rate by
+ * users and by count side by side, plus the average valid score. Without
+ * imported data the card keeps the original "미수집" values.
+ */
+export function CoachProjectMetrics({
+  projectId,
+  labels,
+}: {
+  projectId: string;
+  labels: readonly string[];
+}) {
+  const snap = cardPeriod(useCoachSnapshots(projectId));
   const m = snap ? coachMetrics(snap.period) : null;
-  const values = m
-    ? [text(m.userCompletionRate, "percent"), text(m.averageScore, "decimal")]
-    : ["미수집", "미수집"];
+  const entries: [string, string][] = m
+    ? [
+        [`${labels[0]} (UU)`, text(m.userCompletionRate, "percent")],
+        [`${labels[0]} (횟수)`, text(m.countCompletionRate, "percent")],
+        [labels[1], text(m.averageScore, "decimal")],
+      ]
+    : labels.map((label) => [label, "미수집"]);
   return (
     <>
-      <dl className="metrics">
-        {labels.map((label, i) => (
+      <dl className={m ? "metrics coach-card-metrics" : "metrics"}>
+        {entries.map(([label, value]) => (
           <div key={label}>
             <dt>{label}</dt>
-            <dd className={m ? "coach-card-value" : undefined}>
-              {values[i] ?? "미수집"}
-            </dd>
+            <dd className={m ? "coach-card-value" : undefined}>{value}</dd>
           </div>
         ))}
       </dl>
       {snap && (
         <p className="coach-card-source">
-          GA {snap.period.startDate}~{snap.period.endDate} · 완료율은 UU
-          기준(완료 UU/시작 UU) · 점수는 유효 1~5 건 평균
+          GA {snap.period.startDate}~{snap.period.endDate} · UU 완료율 = 완료
+          UU/시작 UU · 횟수 완료율 = REPORT 전체/시작 횟수 · 점수는 유효 1~5 건
+          평균
         </p>
       )}
+    </>
+  );
+}
+
+/** Replaces the "not connected" note once GA periods were imported. */
+export function CoachCollectionNote({ projectId }: { projectId: string }) {
+  const list = useCoachSnapshots(projectId);
+  if (!list.length) return <>데이터 수집은 아직 연결되지 않았습니다.</>;
+  const last = list.reduce((a, b) =>
+    b.latest.importedAt > a.latest.importedAt ? b : a,
+  ).latest;
+  return (
+    <>
+      GA 기간 {list.length}개 가져옴 · 마지막 {last.importedAt} · Apps Script
+      내보내기 (GA API 직접 연결 아님)
     </>
   );
 }
