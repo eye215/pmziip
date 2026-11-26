@@ -1,0 +1,77 @@
+/**
+ * PM.zip requirement intake from Gmail and Google Calendar (read-only).
+ * Same Apps Script project as Code.gs. PRIVATE path: message bodies are NOT
+ * written to the link-shared sheet. Download the JSON from the web app
+ * (Deploy > Web app, Execute as: Me, Who has access: Only myself) with
+ * ?inbox=1 and import it in PM.zip (통합 수집함 > 요구사항 수집 > Gmail·캘린더 파일).
+ * - Script Properties: INBOX_GMAIL_LABEL (default "PMZIP"), INBOX_DAYS (default 30),
+ *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
+ * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
+ */
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.0.0' };
+var INBOX_MAX_ITEMS = 300;
+var INBOX_MAX_BODY = 20000;
+
+function inboxDomain_(from) {
+  var m = String(from || '').match(/@([A-Za-z0-9.-]+)/);
+  return m ? '@' + m[1].toLowerCase() : null;
+}
+
+function buildInboxExport_() {
+  var props = PropertiesService.getScriptProperties();
+  var label = props.getProperty('INBOX_GMAIL_LABEL') || 'PMZIP';
+  var days = Number(props.getProperty('INBOX_DAYS') || 30);
+  var calDays = Number(props.getProperty('INBOX_CALENDAR_DAYS') || 14);
+  var items = [];
+  var threads = GmailApp.search('label:"' + label.replace(/"/g, '') + '" newer_than:' + days + 'd', 0, 100);
+  threads.forEach(function (thread) {
+    var link = thread.getPermalink();
+    thread.getMessages().forEach(function (m) {
+      if (items.length >= INBOX_MAX_ITEMS) return;
+      items.push({
+        channel: 'gmail',
+        externalId: 'gmail:' + m.getId(),
+        title: String(m.getSubject() || '(제목 없음)').slice(0, 300),
+        body: String(m.getPlainBody() || '').slice(0, INBOX_MAX_BODY),
+        fromDomain: inboxDomain_(m.getFrom()),
+        receivedAt: m.getDate().toISOString(),
+        link: link,
+      });
+    });
+  });
+  if (calDays > 0) {
+    var cal = CalendarApp.getDefaultCalendar();
+    var end = new Date();
+    var start = new Date(end.getTime() - calDays * 864e5);
+    cal.getEvents(start, end).forEach(function (e) {
+      if (items.length >= INBOX_MAX_ITEMS) return;
+      var desc = String(e.getDescription() || '').replace(/<[^>]+>/g, ' ');
+      if (!desc.trim()) return; // only meetings with notes/agenda
+      var eid = Utilities.base64EncodeWebSafe(e.getId().split('@')[0] + ' ' + cal.getId()).replace(/=+$/, '');
+      items.push({
+        channel: 'calendar',
+        externalId: 'calendar:' + e.getId() + ':' + e.getStartTime().toISOString(),
+        title: String(e.getTitle() || '(제목 없음)').slice(0, 300),
+        body: desc.slice(0, INBOX_MAX_BODY),
+        fromDomain: null,
+        receivedAt: e.getStartTime().toISOString(),
+        link: 'https://www.google.com/calendar/event?eid=' + eid,
+      });
+    });
+  }
+  return {
+    format: 'pmzip.inbox-export',
+    formatVersion: 1,
+    generatedAt: new Date().toISOString(),
+    generator: INBOX_GENERATOR,
+    query: { gmailLabel: label, calendarDays: calDays > 0 ? calDays : null },
+    items: items,
+  };
+}
+
+/** Called from doGet(?inbox=1) in Code.gs. */
+function inboxDownload_() {
+  return ContentService.createTextOutput(JSON.stringify(buildInboxExport_()))
+    .setMimeType(ContentService.MimeType.JSON)
+    .downloadAsFile('pmzip-inbox-export.json');
+}

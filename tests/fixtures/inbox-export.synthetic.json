@@ -1,0 +1,42 @@
+{
+  "format": "pmzip.inbox-export",
+  "formatVersion": 1,
+  "generatedAt": "2026-11-26T09:00:00.000Z",
+  "generator": {
+    "name": "Inbox.gs",
+    "version": "1.0.0"
+  },
+  "query": {
+    "gmailLabel": "PMZIP",
+    "calendarDays": 14
+  },
+  "items": [
+    {
+      "channel": "gmail",
+      "externalId": "gmail:synthetic-001",
+      "title": "[합성] 리포트 개선 요청",
+      "body": "안녕하세요.\n\n- 리포트 화면에 국가별 필터를 추가해 주세요.\n- 로그인 후 화면이 멈춤 현상이 있습니다.\n\n감사합니다.\n--\n합성 담당자",
+      "fromDomain": "@example.invalid",
+      "receivedAt": "2026-11-25T01:00:00.000Z",
+      "link": "https://mail.google.com/mail/u/0/#all/synthetic001"
+    },
+    {
+      "channel": "gmail",
+      "externalId": "gmail:synthetic-002",
+      "title": "[합성] 주간 공유",
+      "body": "이번 주 회의록 공유드립니다. 좋은 하루 보내세요.",
+      "fromDomain": "@example.invalid",
+      "receivedAt": "2026-11-24T01:00:00.000Z",
+      "link": "https://mail.google.com/mail/u/0/#all/synthetic002"
+    },
+    {
+      "channel": "calendar",
+      "externalId": "calendar:synthetic-evt:2026-11-20T05:00:00.000Z",
+      "title": "[합성] 고객사 정기 회의",
+      "body": "안건\n1. 월간 리포트는 PDF로 제공하기로 했습니다.\n2. 음성 속도 조절 기능 필요 (12/15까지)",
+      "fromDomain": null,
+      "receivedAt": "2026-11-20T05:00:00.000Z",
+      "link": "https://www.google.com/calendar/event?eid=c3ludGhldGlj"
+    }
+  ]
+}

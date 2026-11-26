@@ -10,6 +10,7 @@ import { DeviceLinkHandler, DeviceLinkPanel } from "../coach-data/device-link";
 import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
 import { PerformanceView } from "../performance/view";
+import { RequirementIntake } from "../intake/panel";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -527,6 +528,7 @@ export function WorkspaceApp() {
                 </div>
               </>
             )}
+            {tab === "inbox" && <RequirementIntake state={state} />}
             {tab === "inbox" && (
               <section className="panel">
                 <div className="section-heading">

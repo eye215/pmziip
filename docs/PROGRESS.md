@@ -61,3 +61,7 @@ PR #5~#17로 `preview/development`에 병합·배포했고 `main`에도 반영�
 - 결정 기록: [ADR 0002](adr/0002-apps-script-export-bridge.md), 설정 방법: [COACH_GA_EXPORT.md](COACH_GA_EXPORT.md).
 
 남은 일: 로그인·DB(기기 간 기록 공유), Business Impact 비교·통계(F39), Gmail·Slack·Teams 수집, AI 해석, GA4 서버 직접 연동(MFA·권한 확보 후).
+
+### 요구사항 수집 (2026-11-26)
+
+통합 수집함에 **요구사항 수집**을 추가했다. 붙여넣기(카카오톡·Teams·Slack·회의록·메일)와 Gmail 라벨·캘린더(비공개 웹앱 파일)를 지원하며, 규칙 기반으로 후보를 뽑고 확인 후 원문·과제 초안으로 등록한다. 설정은 [REQUIREMENT_INTAKE.md](REQUIREMENT_INTAKE.md)를 따른다. Slack·Teams 자동 수집(관리자 승인 필요)과 AI 추출은 미구현이다.
