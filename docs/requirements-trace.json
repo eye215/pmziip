@@ -7,7 +7,7 @@
       "T15",
       "T18"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F02",
@@ -15,7 +15,7 @@
     "tests": [
       "T02"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F03",
@@ -24,7 +24,7 @@
       "T02",
       "T19"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F04",
@@ -32,7 +32,7 @@
     "tests": [
       "T02"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F05",
@@ -150,7 +150,7 @@
     "tests": [
       "T17"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F18",
@@ -160,7 +160,7 @@
       "T16",
       "T27"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F19",
@@ -169,7 +169,7 @@
       "T18",
       "T27"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F20",
@@ -177,7 +177,7 @@
     "tests": [
       "T19"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F21",
@@ -185,7 +185,7 @@
     "tests": [
       "T20"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F22",
@@ -373,6 +373,6 @@
     "tests": [
       "T44"
     ],
-    "status": "planned"
+    "status": "partial"
   }
 ]

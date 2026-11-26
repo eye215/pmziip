@@ -14,7 +14,7 @@ describe("handoff preservation and traceability", () => {
     for (const row of trace) {
       expect(row.phase).toBeGreaterThanOrEqual(1);
       expect(row.tests.length).toBeGreaterThan(0);
-      expect(row.status).toBe("planned");
+      expect(["planned", "local-verified", "partial"]).toContain(row.status);
     }
     const tests = new Set(trace.flatMap(x => x.tests));
     for (let i = 1; i <= 44; i++) expect(tests.has(`T${String(i).padStart(2, "0")}`)).toBe(true);
