@@ -1015,8 +1015,7 @@ function InitiativeEditor({ state, editor, close }: Props) {
       <fieldset className="case-fields">
         <legend>케이스 스터디 (선택)</legend>
         <p className="subtle">
-          포트폴리오에 쓸 기록입니다. 링크는 회사 내부 주소여도 되며, 공개용으로
-          내보낼 때 가립니다.
+          포트폴리오에 쓸 기록입니다. 링크는 회사 내부 주소여도 됩니다.
         </p>
         <div className="field-grid">
           <Field
