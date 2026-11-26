@@ -644,6 +644,32 @@ export function CoachDataPanel({ projects }: { projects: ProjectOption[] }) {
             )}
           </details>
           <h3 className="coach-saved-heading">저장된 기간</h3>
+          {store.loaded && store.loaded.state.snapshots.length > 0 && (
+            <div className="actions">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    // Imported periods only; the sheet link is not included.
+                    const url = URL.createObjectURL(
+                      new Blob([JSON.stringify(store.loaded!.state, null, 2)], {
+                        type: "application/json",
+                      }),
+                    );
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "pmzip-coach-ga-backup.json";
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  } catch {
+                    setError("GA 가져오기 백업 파일을 만들지 못했습니다.");
+                  }
+                }}
+              >
+                GA 가져오기 기록 백업
+              </button>
+            </div>
+          )}
           {!saved.length ? (
             <p className="empty-state">
               이 프로젝트에 가져온 GA 기간이 없습니다.

@@ -66,3 +66,12 @@
 .coach-sheet .error-box {
   overflow-wrap: anywhere;
 }
+.metrics dd.coach-card-value {
+  color: var(--ink);
+}
+.coach-card-source {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}

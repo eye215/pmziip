@@ -6,6 +6,7 @@ import { MeasurementWorkspace } from "../measurement/workspace";
 import { readiness } from "../measurement/model";
 import { SourceSplitReview } from "../measurement/source-split";
 import { CoachDataPanel } from "../coach-data/panel";
+import { CoachProjectMetrics } from "../coach-data/summary";
 import {
   useRecords,
   useView,
@@ -351,14 +352,21 @@ export function WorkspaceApp() {
                           · {project.timezone}
                         </p>
                         {project.description && <p>{project.description}</p>}
-                        <dl className="metrics">
-                          {metrics[project.kind].map((metric) => (
-                            <div key={metric}>
-                              <dt>{metric}</dt>
-                              <dd>미수집</dd>
-                            </div>
-                          ))}
-                        </dl>
+                        {project.kind === "coach" ? (
+                          <CoachProjectMetrics
+                            projectId={project.id}
+                            labels={metrics.coach}
+                          />
+                        ) : (
+                          <dl className="metrics">
+                            {metrics[project.kind].map((metric) => (
+                              <div key={metric}>
+                                <dt>{metric}</dt>
+                                <dd>미수집</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
                         <p className="empty-note">
                           과제{" "}
                           {
