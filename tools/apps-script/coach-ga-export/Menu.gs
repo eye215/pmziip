@@ -22,6 +22,33 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * The sheet UI, or — when run from the script editor that was not opened
+ * from the sheet (getUi is unavailable there) — a stand-in that writes the
+ * messages to the execution log. Yes/No questions answer "No" there, so
+ * nothing is switched on without the sheet's confirmation.
+ */
+function pmzipUi_() {
+  try {
+    return SpreadsheetApp.getUi();
+  } catch (e) {
+    return {
+      noDialog: true,
+      ButtonSet: { OK_CANCEL: 'OK_CANCEL', YES_NO: 'YES_NO' },
+      Button: { OK: 'OK', YES: 'YES', NO: 'NO', CANCEL: 'CANCEL' },
+      alert: function () {
+        var args = [].slice.call(arguments);
+        Logger.log(args.filter(function (a) { return typeof a === 'string' && a !== 'YES_NO'; }).join('\n'));
+        return args.indexOf('YES_NO') >= 0 ? 'NO' : 'OK';
+      },
+      prompt: function () {
+        Logger.log('입력창은 시트의 PM.zip 메뉴에서만 열립니다. 시트의 pmzip_settings 탭에 직접 입력하세요.');
+        return { getSelectedButton: function () { return 'CANCEL'; }, getResponseText: function () { return ''; } };
+      },
+    };
+  }
+}
+
 function pmzipProps_() {
   return PropertiesService.getScriptProperties();
 }
@@ -36,7 +63,7 @@ function pmzipLabelNames_(max) {
 }
 
 function pmzipSetInboxLabels() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var props = pmzipProps_();
   var picked = pmzipCheckedLabels_();
   var current = (picked && picked.join(', ')) || pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP';
@@ -64,7 +91,7 @@ function pmzipSetInboxLabels() {
 }
 
 function pmzipSetInboxQuery() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var props = pmzipProps_();
   var current = pmzipSetting_('INBOX_GMAIL_QUERY') || '(없음 — 라벨 사용)';
   var res = ui.prompt(
@@ -80,7 +107,7 @@ function pmzipSetInboxQuery() {
 }
 
 function pmzipSetInboxDays() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var props = pmzipProps_();
   var res = ui.prompt(
     '메일 가져올 기간',
@@ -98,7 +125,7 @@ function pmzipSetInboxDays() {
 }
 
 function pmzipSetSlackChannels() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var props = pmzipProps_();
   var res = ui.prompt(
     'Slack 채널',
@@ -115,7 +142,7 @@ function pmzipSetSlackChannels() {
 }
 
 function pmzipRunInboxNow() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var props = pmzipProps_();
   if (props.getProperty('INBOX_SHEET') !== 'on') {
     var ok = ui.alert(
@@ -137,7 +164,7 @@ function pmzipRunInboxNow() {
 
 /** Installs the daily trigger as the account clicking the menu (the mail account). */
 function pmzipInstallInboxTrigger() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   if (pmzipProps_().getProperty('INBOX_SHEET') !== 'on') {
     ui.alert('먼저 "요구사항 메일 지금 가져오기"를 한 번 실행해 공유 시트 기록을 켜 주세요.');
     return;
@@ -152,10 +179,17 @@ function pmzipInstallInboxTrigger() {
  * chosen labels to pmzip_settings and syncs the checkbox list there.
  */
 function pmzipPickLabels() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = pmzipUi_();
   var names = pmzipLabelNames_(PMZIP_LABEL_MAX);
   if (!names.length) {
     ui.alert('Gmail 라벨을 읽지 못했거나 사용자 라벨이 없습니다. 메일 계정으로 로그인했는지, Gmail에 라벨이 있는지 확인해 주세요.');
+    return;
+  }
+  if (ui.noDialog) {
+    // Run from the editor: put the labels in the sheet as checkboxes instead.
+    var n = pmzipRefreshLabelList_();
+    ui.alert('시트의 pmzip_settings 탭 "Gmail 라벨 목록"에 라벨 ' + n + '개를 체크박스로 넣었습니다. ' +
+      '가져올 라벨을 체크한 뒤 pmzipRunInboxNow를 실행하세요.');
     return;
   }
   var current = pmzipCheckedLabels_() ||
@@ -237,7 +271,7 @@ function pmzipOpenSettings() {
 function pmzipShowSettings() {
   var p = pmzipProps_();
   var q = pmzipSetting_('INBOX_GMAIL_QUERY');
-  SpreadsheetApp.getUi().alert(
+  pmzipUi_().alert(
     'PM.zip 설정\n\n' +
       '메일 대상: ' + (q ? '검색식 ' + q : '라벨 ' + (((pmzipCheckedLabels_() || []).join(', ')) || pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP')) + '\n' +
       '기간: 최근 ' + (pmzipSetting_('INBOX_DAYS') || '30') + '일\n' +
