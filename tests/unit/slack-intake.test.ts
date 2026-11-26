@@ -26,7 +26,7 @@ function slack(url: string) {
           response_metadata: { next_cursor: "" },
         })
       : ok({
-          channels: [{ id: "C0001", name: "pj-coach" }],
+          channels: [{ id: "C0001", name: "pj-coach", is_member: true }],
           response_metadata: { next_cursor: "p2" },
         });
   if (method === "conversations.history") {
@@ -175,8 +175,10 @@ describe("Slack.gs intake", () => {
       INBOX_CALENDAR_DAYS: "0",
     });
     const status = vm.runInContext("exportInboxToSheet()", w.ctx);
+    // The channel list is refreshed first; typed names it does not contain are
+    // not checked, so only the visible channel is read.
     expect(status).toBe(
-      "Gmail 0건 (라벨 PMZIP, 최근 30일) · 캘린더 끔 · Slack 1건 — Slack 채널을 찾지 못했거나 봇이 초대되지 않았습니다: unknown-channel",
+      "Gmail 0건 (라벨 PMZIP, 최근 30일) · 캘린더 끔 · Slack 1건",
     );
     expect(w.sheets.get("pmzip_inbox")![0][1]).toContain(status);
     expect(w.sheets.get("pmzip_inbox")![0][1]).not.toContain(TOKEN);
@@ -210,5 +212,68 @@ describe("Slack.gs intake", () => {
     const r = vm.runInContext("slackItems_(10)", w.ctx);
     expect(r.items).toHaveLength(0);
     expect(r.notes[0]).toContain("unknown-channel");
+  });
+  it("Slack channels as checkboxes (columns E–G) with bot membership; checked channels are read", () => {
+    const w = world({
+      SLACK_BOT_TOKEN: TOKEN,
+      SLACK_CHANNELS: "pj-coach",
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    expect(vm.runInContext("pmzipRefreshSlackList_()", w.ctx)).toBe(2);
+    const grid = w.sheets.get("pmzip_settings")!;
+    const at = grid.findIndex((r) => r[4] === "Slack 채널 목록");
+    expect(at).toBe(0); // row 1, beside the settings
+    expect(grid.slice(1, 3).map((r) => [r[4], r[5], r[6]])).toEqual([
+      ["pj-coach", "true", "봇 참여"],
+      ["next-ai-team", "false", "초대 필요 (/invite)"],
+    ]);
+    // Settings in A–C are untouched by the Slack list.
+    expect(grid[1][0]).toBe("Gmail 라벨");
+    // Tick next-ai-team, untick pj-coach → only next-ai-team is read.
+    grid[1][5] = "false";
+    grid[2][5] = "TRUE";
+    const file = inboxExportSchema.parse(
+      JSON.parse(JSON.stringify(vm.runInContext("buildInboxExport_()", w.ctx))),
+    );
+    expect(file.items.map((i) => i.title)).toEqual([
+      "[#next-ai-team] 기획서 (https://example.invalid/doc) 확인 부탁드립니다",
+    ]);
+    // Gmail label list (A–C) and Slack list (E–G) do not overwrite each other.
+    (w.ctx.GmailApp as Record<string, unknown>).getUserLabels = () =>
+      ["PMZIP", "고객요청", "a", "b", "c", "d", "e", "f"].map((n) => ({
+        getName: () => n,
+      }));
+    vm.runInContext("pmzipRefreshLabelList_()", w.ctx);
+    vm.runInContext("pmzipRefreshSlackList_()", w.ctx);
+    const g2 = w.sheets.get("pmzip_settings")!;
+    expect(g2.filter((r) => r[4] === "Slack 채널 목록")).toHaveLength(1);
+    expect(g2.filter((r) => r[0] === "Gmail 라벨 목록")).toHaveLength(1);
+    expect(g2[2][5]).toBe("true"); // check kept
+  });
+  it("saving a Slack pick keeps only visible channels and lists ones needing /invite", () => {
+    const w = world({
+      SLACK_BOT_TOKEN: TOKEN,
+      INBOX_CALENDAR_DAYS: "0",
+    });
+    for (const f of ["Menu.gs"])
+      vm.runInContext(
+        readFileSync(`tools/apps-script/coach-ga-export/${f}`, "utf8"),
+        w.ctx,
+      );
+    const msg = vm.runInContext(
+      'pmzipSaveSlackPick(["#pj-coach", "next-ai-team", "없는채널"], false)',
+      w.ctx,
+    );
+    expect(msg).toBe(
+      "저장했습니다: pj-coach, next-ai-team\n\n봇 초대가 필요한 채널: #next-ai-team (각 채널에서 /invite @봇이름)",
+    );
+    const grid = w.sheets.get("pmzip_settings")!;
+    expect(grid.find((r) => r[0] === "Slack 채널")![1]).toBe(
+      "pj-coach, next-ai-team",
+    );
+    expect(JSON.stringify(grid)).not.toContain(TOKEN);
+    expect(() =>
+      vm.runInContext('pmzipSaveSlackPick(["없는채널"], false)', w.ctx),
+    ).toThrow("하나 이상");
   });
 });
