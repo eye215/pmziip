@@ -8,7 +8,7 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.3.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.4.0' };
 /** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
 var INBOX_LAST_STATUS_ = '';
 var INBOX_MAX_ITEMS = 300;
@@ -94,39 +94,96 @@ function pmzipSaveSetting_(key, value) {
 }
 
 /**
- * Pick labels with checkboxes: section "Gmail 라벨 목록" under the settings,
- * filled from the running account's Gmail labels (refreshed on every run,
- * checks kept). Checked labels win over the typed "Gmail 라벨" cell.
+ * Pick lists with checkboxes in pmzip_settings. Gmail labels sit under the
+ * settings (columns A–C), Slack channels beside them (columns E–G), so the
+ * two lists never overwrite each other. Lists are refreshed on every run
+ * (checks kept by name); checked items win over the typed setting.
  */
-var PMZIP_LABEL_LIST = 'Gmail 라벨 목록';
+var PMZIP_LISTS = {
+  gmail: {
+    title: 'Gmail 라벨 목록', col: 1, setting: 'INBOX_GMAIL_LABEL', fallback: 'PMZIP',
+    note: '체크한 라벨의 메일만 가져옵니다. 목록은 수집할 때마다 실행한 계정의 라벨로 갱신됩니다.',
+  },
+  slack: {
+    title: 'Slack 채널 목록', col: 5, setting: 'SLACK_CHANNELS', fallback: '',
+    note: '체크한 채널만 가져옵니다. "초대 필요" 채널은 그 채널에서 /invite 로 봇을 넣어야 읽힙니다.',
+  },
+};
+var PMZIP_LABEL_LIST = PMZIP_LISTS.gmail.title;
 var PMZIP_LABEL_MAX = 300;
 
-function pmzipLabelSectionAt_(rows) {
-  for (var i = 0; i < rows.length; i++) if (String(rows[i][0]).trim() === PMZIP_LABEL_LIST) return i;
-  return -1;
-}
 function pmzipIsChecked_(v) {
   return v === true || String(v).toLowerCase() === 'true';
 }
-
-/** Checked labels, or null when the list does not exist / nothing is checked. */
-function pmzipCheckedLabels_() {
-  var rows = pmzipSettingsRows_();
-  var at = pmzipLabelSectionAt_(rows);
-  if (at < 0) return null;
+function pmzipListAt_(rows, spec) {
+  for (var i = 0; i < rows.length; i++) if (String(rows[i][spec.col - 1] === undefined ? '' : rows[i][spec.col - 1]).trim() === spec.title) return i;
+  return -1;
+}
+/** Item rows below the title: consecutive non-empty names in the list column. */
+function pmzipListItems_(rows, spec, at) {
   var out = [];
   for (var j = at + 1; j < rows.length; j++) {
-    var name = String(rows[j][0]).trim();
-    if (name && pmzipIsChecked_(rows[j][1])) out.push(name);
+    var name = String(rows[j][spec.col - 1] === undefined ? '' : rows[j][spec.col - 1]).trim();
+    if (!name) break;
+    out.push({ name: name, checked: pmzipIsChecked_(rows[j][spec.col]) });
   }
+  return out;
+}
+/** Checked names, or null when the list does not exist / nothing is checked. */
+function pmzipCheckedIn_(spec) {
+  var rows = pmzipSettingsRows_();
+  var at = pmzipListAt_(rows, spec);
+  if (at < 0) return null;
+  var out = pmzipListItems_(rows, spec, at).filter(function (x) { return x.checked; })
+    .map(function (x) { return x.name; });
   return out.length ? out : null;
 }
 
 /**
- * Writes the account's labels as checkbox rows. Checks are kept by name;
- * `checkOnly` (array) replaces them. Returns the number of labels, or -1
- * when Gmail labels cannot be read.
+ * Writes `items` ([{name, note}]) as checkbox rows of `spec`. Checks are kept
+ * by name; `checkOnly` (array) replaces them. Returns the number of items.
  */
+function pmzipWriteList_(spec, items, checkOnly) {
+  var sh = pmzipEnsureSettingsSheet_();
+  if (!sh) return -1;
+  var rows = sh.getDataRange().getValues();
+  var at = pmzipListAt_(rows, spec);
+  var old = at >= 0 ? pmzipListItems_(rows, spec, at) : [];
+  var keep = checkOnly;
+  if (!keep) {
+    keep = at >= 0
+      ? old.filter(function (x) { return x.checked; }).map(function (x) { return x.name; })
+      : String(pmzipSetting_(spec.setting) || spec.fallback).split(',');
+  }
+  var checked = {};
+  keep.forEach(function (n) { checked[String(n).trim().replace(/^#/, '')] = true; });
+  // 1-based title row: existing, else below the settings (Gmail) or row 1 (Slack).
+  var head = at >= 0 ? at + 1 : (spec.col === 1 ? PMZIP_SETTINGS.length + 3 : 1);
+  if (old.length) {
+    var stale = sh.getRange(head + 1, spec.col, old.length, 3);
+    stale.clearDataValidations();
+    stale.clearContent();
+  }
+  sh.getRange(head, spec.col, 1, 3).setValues([[spec.title, '가져오기 (체크)', spec.note]]);
+  if (items.length) {
+    sh.getRange(head + 1, spec.col, items.length, 1).setNumberFormat('@')
+      .setValues(items.map(function (x) { return [x.name]; }));
+    var boxes = sh.getRange(head + 1, spec.col + 1, items.length, 1);
+    boxes.insertCheckboxes();
+    boxes.setValues(items.map(function (x) { return [!!checked[x.name]]; }));
+    sh.getRange(head + 1, spec.col + 2, items.length, 1).setNumberFormat('@')
+      .setValues(items.map(function (x) { return [x.note || '']; }));
+  }
+  return items.length;
+}
+
+function pmzipLabelSectionAt_(rows) {
+  return pmzipListAt_(rows, PMZIP_LISTS.gmail);
+}
+function pmzipCheckedLabels_() {
+  return pmzipCheckedIn_(PMZIP_LISTS.gmail);
+}
+/** This account's Gmail labels as checkboxes. -1 when labels cannot be read. */
 function pmzipRefreshLabelList_(checkOnly) {
   var names;
   try {
@@ -135,40 +192,9 @@ function pmzipRefreshLabelList_(checkOnly) {
     return -1;
   }
   names.sort();
-  names = names.slice(0, PMZIP_LABEL_MAX);
-  var sh = pmzipEnsureSettingsSheet_();
-  if (!sh) return -1;
-  var rows = sh.getDataRange().getValues();
-  var at = pmzipLabelSectionAt_(rows);
-  var checked = {};
-  var keep = checkOnly;
-  if (!keep) {
-    if (at >= 0) {
-      keep = [];
-      for (var j = at + 1; j < rows.length; j++)
-        if (pmzipIsChecked_(rows[j][1])) keep.push(String(rows[j][0]).trim());
-    } else {
-      keep = String(pmzipSetting_('INBOX_GMAIL_LABEL') || 'PMZIP').split(',');
-    }
-  }
-  keep.forEach(function (n) { checked[String(n).trim()] = true; });
-  var head = at >= 0 ? at + 1 : rows.length + 2; // 1-based row of the section title
-  var old = at >= 0 ? rows.length - head : 0;
-  if (old > 0) {
-    var stale = sh.getRange(head + 1, 1, old, 3);
-    stale.clearDataValidations();
-    stale.clearContent();
-  }
-  sh.getRange(head, 1, 1, 3).setValues([[PMZIP_LABEL_LIST, '가져오기 (체크)',
-    '체크한 라벨의 메일만 가져옵니다. 목록은 수집할 때마다 실행한 계정의 라벨로 갱신됩니다.']]);
-  if (names.length) {
-    sh.getRange(head + 1, 1, names.length, 1).setNumberFormat('@')
-      .setValues(names.map(function (n) { return [n]; }));
-    var boxes = sh.getRange(head + 1, 2, names.length, 1);
-    boxes.insertCheckboxes();
-    boxes.setValues(names.map(function (n) { return [!!checked[n]]; }));
-  }
-  return names.length;
+  return pmzipWriteList_(PMZIP_LISTS.gmail, names.slice(0, PMZIP_LABEL_MAX).map(function (n) {
+    return { name: n, note: '' };
+  }), checkOnly);
 }
 
 function buildInboxExport_() {
@@ -226,7 +252,7 @@ function buildInboxExport_() {
       var slack = slackItems_(INBOX_MAX_ITEMS - items.length);
       items = items.concat(slack.items);
       notes = slack.notes;
-      var on = props.getProperty('SLACK_BOT_TOKEN') && pmzipSetting_('SLACK_CHANNELS');
+      var on = props.getProperty('SLACK_BOT_TOKEN') && (pmzipCheckedIn_(PMZIP_LISTS.slack) || pmzipSetting_('SLACK_CHANNELS'));
       slackPart = on ? 'Slack ' + slack.items.length + '건' : 'Slack 미설정(토큰·채널)';
     } catch (e) {
       // Mail and calendar still go out when Slack fails.
@@ -291,6 +317,13 @@ function exportInboxToSheet() {
   if (PropertiesService.getScriptProperties().getProperty('INBOX_SHEET') !== 'on')
     throw new Error('스크립트 속성 INBOX_SHEET=on 을 설정한 뒤 실행해 주세요 (공유 시트에 메일 내용이 기록됩니다).');
   pmzipRefreshLabelList_(); // this account's labels as checkboxes, checks kept
+  if (typeof pmzipRefreshSlackList_ === 'function') {
+    try {
+      pmzipRefreshSlackList_();
+    } catch (e) {
+      // A Slack error is reported in the status line by buildInboxExport_.
+    }
+  }
   var data = buildInboxExport_();
   data.items.forEach(function (it) {
     it.title = inboxClean_(it.title).slice(0, 300);

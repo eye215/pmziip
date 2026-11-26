@@ -12,7 +12,8 @@ function onOpen() {
     .addItem('가져올 Gmail 라벨 직접 입력', 'pmzipSetInboxLabels')
     .addItem('Gmail 검색식으로 설정 (고급)', 'pmzipSetInboxQuery')
     .addItem('메일 가져올 기간(일) 설정', 'pmzipSetInboxDays')
-    .addItem('Slack 채널 설정', 'pmzipSetSlackChannels')
+    .addItem('Slack 채널 고르기 (여러 개 선택)', 'pmzipPickSlackChannels')
+    .addItem('Slack 채널 직접 입력', 'pmzipSetSlackChannels')
     .addSeparator()
     .addItem('요구사항 메일 지금 가져오기', 'pmzipRunInboxNow')
     .addItem('요구사항 메일 매일 자동 수집 켜기', 'pmzipInstallInboxTrigger')
@@ -138,6 +139,14 @@ function pmzipSetSlackChannels() {
   if (res.getSelectedButton() !== ui.Button.OK) return;
   var channels = res.getResponseText().split(',').map(function (s) { return s.trim().replace(/^#/, ''); }).filter(String);
   pmzipSaveSetting_('SLACK_CHANNELS', channels.join(', '));
+  // Keep the checkbox list (which wins over the typed cell) in sync.
+  if (pmzipListAt_(pmzipSettingsRows_(), PMZIP_LISTS.slack) >= 0 && props.getProperty('SLACK_BOT_TOKEN')) {
+    try {
+      pmzipRefreshSlackList_(channels);
+    } catch (e) {
+      Logger.log('Slack 채널 목록을 갱신하지 못했습니다: ' + e);
+    }
+  }
   ui.alert(channels.length ? '저장했습니다: ' + channels.join(', ') : 'Slack 수집을 껐습니다.');
 }
 
@@ -214,8 +223,16 @@ function pmzipSaveLabelPick(labels, runNow) {
 }
 
 function pmzipLabelPickerHtml_(names, current, canRun) {
-  // JSON embedded with "<" escaped so label names cannot close the script tag.
-  var data = JSON.stringify({ names: names, current: current, canRun: !!canRun }).replace(/</g, '\\u003c');
+  return pmzipPickerHtml_({ names: names, current: current, canRun: canRun, fn: 'pmzipSaveLabelPick',
+    search: '라벨 검색', group: 'Gmail 라벨' });
+}
+
+/** opts: {names, current, canRun, fn, search, group, notes?: {name: text}} */
+function pmzipPickerHtml_(opts) {
+  // JSON embedded with "<" escaped so names cannot close the script tag.
+  var data = JSON.stringify({
+    names: opts.names, current: opts.current, canRun: !!opts.canRun, fn: opts.fn, notes: opts.notes || {},
+  }).replace(/</g, '\\u003c');
   return [
     '<!doctype html><html><head><base target="_top"><meta charset="utf-8"><style>',
     'body{font:14px/1.5 system-ui,sans-serif;margin:0;padding:12px;color:#1f2937}',
@@ -227,9 +244,9 @@ function pmzipLabelPickerHtml_(names, current, canRun) {
     'button.primary{background:#2563eb;color:#fff;border-color:#2563eb}',
     'button:focus-visible,input:focus-visible{outline:2px solid #2563eb;outline-offset:2px}',
     '#msg{white-space:pre-wrap;margin-top:10px}</style></head><body>',
-    '<label for="q">라벨 검색</label><input id="q" type="search" autocomplete="off">',
+    '<label for="q">' + opts.search + '</label><input id="q" type="search" autocomplete="off">',
     '<div id="count" aria-live="polite"></div>',
-    '<div id="list" role="group" aria-label="Gmail 라벨"></div>',
+    '<div id="list" role="group" aria-label="' + opts.group + '"></div>',
     '<div class="bar"><button type="button" id="all">보이는 것 모두 선택</button>',
     '<button type="button" id="none">모두 해제</button></div>',
     '<div class="bar"><button type="button" class="primary" id="save">저장</button>',
@@ -243,7 +260,7 @@ function pmzipLabelPickerHtml_(names, current, canRun) {
     'D.names.forEach(function(n,i){if(f&&n.toLowerCase().indexOf(f)<0)return;',
     'var l=document.createElement("label");l.className="row";var c=document.createElement("input");',
     'c.type="checkbox";c.checked=!!chosen[n];c.onchange=function(){chosen[n]=c.checked;count();};',
-    'l.appendChild(c);l.appendChild(document.createTextNode(n));list.appendChild(l);});count();}',
+    'l.appendChild(c);l.appendChild(document.createTextNode(n+(D.notes[n]?" · "+D.notes[n]:"")));list.appendChild(l);});count();}',
     'function picked(){return D.names.filter(function(n){return chosen[n];});}',
     'function count(){document.getElementById("count").textContent="선택 "+picked().length+"개 / 전체 "+D.names.length+"개";}',
     'q.oninput=draw;',
@@ -255,10 +272,56 @@ function pmzipLabelPickerHtml_(names, current, canRun) {
     'function save(now){var p=picked();if(!p.length){msg.textContent="라벨을 하나 이상 선택해 주세요.";return;}',
     'msg.textContent=now?"저장하고 가져오는 중…":"저장 중…";',
     'google.script.run.withSuccessHandler(function(m){msg.textContent=m;})',
-    '.withFailureHandler(function(e){msg.textContent="오류: "+(e&&e.message||e);}).pmzipSaveLabelPick(p,now);}',
+    '.withFailureHandler(function(e){msg.textContent="오류: "+(e&&e.message||e);})[D.fn](p,now);}',
     'document.getElementById("save").onclick=function(){save(false);};run.onclick=function(){save(true);};',
     'draw();q.focus();</script></body></html>',
   ].join('\n');
+}
+
+/** Multi-select Slack channels (needs SLACK_BOT_TOKEN in Script Properties). */
+function pmzipPickSlackChannels() {
+  var ui = pmzipUi_();
+  var token = pmzipProps_().getProperty('SLACK_BOT_TOKEN');
+  if (!token) {
+    ui.alert('먼저 프로젝트 설정 > 스크립트 속성에 SLACK_BOT_TOKEN(xoxb-…)을 넣어 주세요. 토큰은 시트에 쓰지 않습니다.');
+    return;
+  }
+  var list = slackChannelList_(token).slice(0, PMZIP_LABEL_MAX);
+  if (ui.noDialog) {
+    var n = pmzipRefreshSlackList_();
+    ui.alert('시트의 pmzip_settings 탭 "Slack 채널 목록"(E열)에 채널 ' + n + '개를 체크박스로 넣었습니다. ' +
+      '가져올 채널을 체크한 뒤 pmzipRunInboxNow를 실행하세요. "초대 필요" 채널은 /invite 로 봇을 넣어야 읽힙니다.');
+    return;
+  }
+  var notes = {};
+  list.forEach(function (c) { notes[c.name] = c.member ? '봇 참여' : '초대 필요'; });
+  var current = pmzipCheckedIn_(PMZIP_LISTS.slack) ||
+    String(pmzipSetting_('SLACK_CHANNELS')).split(',').map(function (x) { return x.trim().replace(/^#/, ''); }).filter(String);
+  var html = HtmlService.createHtmlOutput(pmzipPickerHtml_({
+    names: list.map(function (c) { return c.name; }), current: current, notes: notes,
+    canRun: pmzipProps_().getProperty('INBOX_SHEET') === 'on', fn: 'pmzipSaveSlackPick',
+    search: '채널 검색', group: 'Slack 채널',
+  })).setWidth(440).setHeight(560);
+  ui.showModalDialog(html, '가져올 Slack 채널 (여러 개 선택)');
+}
+
+/** Called from the dialog. Only channels the bot can see are kept. */
+function pmzipSaveSlackPick(channels, runNow) {
+  var token = pmzipProps_().getProperty('SLACK_BOT_TOKEN');
+  if (!token) throw new Error('SLACK_BOT_TOKEN이 없습니다.');
+  var list = slackChannelList_(token);
+  var known = list.map(function (c) { return c.name; });
+  var picked = (Array.isArray(channels) ? channels : []).map(function (x) { return String(x).trim().replace(/^#/, ''); })
+    .filter(function (x, k, a) { return x && known.indexOf(x) >= 0 && a.indexOf(x) === k; }).slice(0, 50);
+  if (!picked.length) throw new Error('채널을 하나 이상 선택해 주세요.');
+  pmzipSaveSetting_('SLACK_CHANNELS', picked.join(', '));
+  pmzipRefreshSlackList_(picked);
+  var invite = list.filter(function (c) { return picked.indexOf(c.name) >= 0 && !c.member; })
+    .map(function (c) { return '#' + c.name; });
+  var msg = '저장했습니다: ' + picked.join(', ') +
+    (invite.length ? '\n\n봇 초대가 필요한 채널: ' + invite.join(', ') + ' (각 채널에서 /invite @봇이름)' : '');
+  if (runNow && pmzipProps_().getProperty('INBOX_SHEET') === 'on') msg += '\n\n' + exportInboxToSheet();
+  return msg;
 }
 
 /** Shows (creating if needed) the pmzip_settings tab where values are typed directly. */
@@ -277,7 +340,7 @@ function pmzipShowSettings() {
       '기간: 최근 ' + (pmzipSetting_('INBOX_DAYS') || '30') + '일\n' +
       '캘린더: 최근 ' + (pmzipSetting_('INBOX_CALENDAR_DAYS') || '14') + '일 (0이면 끔)\n' +
       '공유 시트 기록: ' + (p.getProperty('INBOX_SHEET') === 'on' ? '켜짐' : '꺼짐') + '\n' +
-      'Slack 채널: ' + (pmzipSetting_('SLACK_CHANNELS') || '없음') +
+      'Slack 채널: ' + (((pmzipCheckedIn_(PMZIP_LISTS.slack) || []).join(', ')) || pmzipSetting_('SLACK_CHANNELS') || '없음') +
         ' (토큰 ' + (p.getProperty('SLACK_BOT_TOKEN') ? '설정됨' : '없음') + ')\n' +
       'DART 회사: ' + (p.getProperty('DART_CORP_CODE') || '미설정') + '\n' +
       'StatCounter 국가: ' + (p.getProperty('STATCOUNTER_COUNTRIES')

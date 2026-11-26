@@ -45,7 +45,8 @@ function slackIsHuman_(m) {
 function slackItems_(maxItems) {
   var props = PropertiesService.getScriptProperties();
   var token = props.getProperty('SLACK_BOT_TOKEN');
-  var wanted = String(pmzipSetting_('SLACK_CHANNELS')).split(',')
+  var picked = pmzipCheckedIn_(PMZIP_LISTS.slack);
+  var wanted = (picked || String(pmzipSetting_('SLACK_CHANNELS')).split(','))
     .map(function (c) { return c.trim().replace(/^#/, ''); }).filter(String);
   if (!token || !wanted.length) return { items: [], notes: [] };
   var days = Number(props.getProperty('SLACK_DAYS') || pmzipSetting_('INBOX_DAYS') || 30);
@@ -97,4 +98,34 @@ function slackItems_(maxItems) {
     });
   });
   return { items: items, notes: notes };
+}
+
+/** Channels the bot can see: [{name, id, member}], members first, then by name. */
+function slackChannelList_(token) {
+  var out = [];
+  var cursor = '';
+  do {
+    var page = slackApi_(token, 'conversations.list', {
+      types: 'public_channel,private_channel', exclude_archived: 'true', limit: '200', cursor: cursor,
+    });
+    page.channels.forEach(function (c) { out.push({ name: c.name, id: c.id, member: !!c.is_member }); });
+    cursor = (page.response_metadata && page.response_metadata.next_cursor) || '';
+  } while (cursor);
+  out.sort(function (a, b) {
+    return a.member !== b.member ? (a.member ? -1 : 1) : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  });
+  return out;
+}
+
+/**
+ * Slack channels as checkboxes in pmzip_settings (columns E–G), with whether
+ * the bot is already in each one. Returns the count, or -2 without a token.
+ */
+function pmzipRefreshSlackList_(checkOnly) {
+  var token = PropertiesService.getScriptProperties().getProperty('SLACK_BOT_TOKEN');
+  if (!token) return -2;
+  var list = slackChannelList_(token).slice(0, PMZIP_LABEL_MAX);
+  return pmzipWriteList_(PMZIP_LISTS.slack, list.map(function (c) {
+    return { name: c.name, note: c.member ? '봇 참여' : '초대 필요 (/invite)' };
+  }), checkOnly);
 }
