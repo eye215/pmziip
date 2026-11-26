@@ -1,0 +1,222 @@
+.perf {
+  display: grid;
+  gap: 20px;
+}
+.perf-section h2 {
+  margin-bottom: 0;
+}
+.perf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.perf-head select {
+  width: auto;
+  max-width: 100%;
+}
+.perf-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.perf-period {
+  max-width: 320px;
+  margin-top: 0;
+}
+
+/* KPI row of stat tiles */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 14px;
+}
+.stat-tile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 4px 0 2px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.stat-delta {
+  font-size: 12px;
+  color: var(--body);
+  margin: 0;
+}
+
+/* Charts */
+.perf-chart {
+  margin: 18px 0 8px;
+}
+.perf-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.perf-chart-head h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.perf-chart-head select {
+  width: auto;
+  max-width: 100%;
+}
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  margin-top: 8px;
+}
+.chart-grid {
+  stroke: #edf0f4;
+  stroke-width: 1;
+}
+.chart-axis {
+  font-size: 13px;
+  fill: var(--muted);
+}
+.chart-value {
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--ink);
+}
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart-dot {
+  fill: var(--accent);
+  stroke: #fff;
+  stroke-width: 2;
+}
+.chart-col {
+  fill: #9db5ec;
+}
+.chart-col-latest {
+  fill: var(--accent);
+}
+.chart-hit-area {
+  fill: transparent;
+}
+.chart-hit:hover .chart-col,
+.chart-hit:focus .chart-col {
+  fill: var(--accent);
+}
+.chart-hit:hover .chart-dot,
+.chart-hit:focus .chart-dot {
+  r: 6;
+}
+.chart-hit:focus {
+  outline: none;
+}
+.chart-hit:focus .chart-hit-area {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* Company switcher */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Share table */
+.share-table td,
+.share-table th[scope="row"] {
+  vertical-align: middle;
+}
+.share-table th[scope="row"] {
+  min-width: 7.5em;
+  white-space: normal;
+  word-break: keep-all;
+}
+.share-cell {
+  white-space: nowrap;
+}
+.inline-bar {
+  display: inline-block;
+  width: 70px;
+  height: 8px;
+  background: #e8edf8;
+  border-radius: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.inline-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+/* Data tab: compact connector summary */
+.connector-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--body);
+}
+
+@media (max-width: 700px) {
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .stat-value {
+    font-size: 22px;
+  }
+  .inline-bar {
+    width: 28px;
+    margin-right: 6px;
+  }
+  .share-table th,
+  .share-table td {
+    padding: 8px 4px;
+  }
+  .chart-axis {
+    font-size: 18px;
+  }
+  .chart-value {
+    font-size: 20px;
+  }
+}
