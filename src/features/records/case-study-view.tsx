@@ -109,6 +109,23 @@ export function CaseStudyView({
   const lines = caseStudy(work, state, summary);
   const done = lines.filter((l) => !l.missing).length;
   const flow = flowStages(work, state, !!summary);
+  const linkedCount = state.links.filter(
+    (l) => l.initiativeId === work.id,
+  ).length;
+  const stageNote = (key: string) =>
+    key === "collect"
+      ? `원문 ${linkedCount}건`
+      : key === "decide"
+        ? work.status === "canceled"
+          ? "안 하기로"
+          : "결정됨"
+        : key === "change"
+          ? work.changeSummary
+            ? work.changeSummary.slice(0, 24)
+            : "기록 있음"
+          : key === "release"
+            ? (releaseDay ?? "배포됨")
+            : "변화 관찰";
   const reached = flow.stages.filter((x) => x.done);
   const current = flow.declined
     ? "안 하기로 결정"
@@ -149,6 +166,14 @@ export function CaseStudyView({
         <summary>
           케이스 스터디 · {done}/{lines.length} 작성
         </summary>
+        <ol className="flow-steps" aria-label="단계별 기록">
+          {flow.stages.map((x) => (
+            <li key={x.key} className={x.done ? `done st-${x.key}` : undefined}>
+              <b>{x.label}</b>
+              <span>{x.done ? stageNote(x.key) : "아직"}</span>
+            </li>
+          ))}
+        </ol>
         <ol className="case-lines">
           {lines.map((l) => (
             <li key={l.key} className={l.missing ? "case-missing" : undefined}>

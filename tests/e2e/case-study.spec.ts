@@ -85,6 +85,11 @@ test("case study fields save on the initiative and show as eight lines", async (
     card.getByRole("list", { name: "진행 단계: 배포" }),
   ).toBeVisible();
   await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
+  const steps = card.getByRole("list", { name: "단계별 기록" });
+  await expect(steps.getByRole("listitem")).toHaveCount(5);
+  await expect(steps.getByRole("listitem").nth(2)).toContainText(
+    "버튼 위치 이동",
+  );
   const lines = card.locator(".case-lines li");
   await expect(lines).toHaveCount(8);
   await expect(lines.nth(3)).toContainText("버튼 위치 이동");

@@ -43,6 +43,13 @@ test("impact report: period draft, finalize once as a snapshot, survives reload"
     has: page.getByText("배포", { exact: true }),
   });
   await expect(released.locator("dd")).toHaveText("1");
+  await expect(
+    panel
+      .getByRole("list", { name: "흐름" })
+      .first()
+      .getByRole("listitem")
+      .filter({ hasText: /^배포/ }),
+  ).toContainText("1");
   await expect(panel.locator(".report-case summary")).toContainText(
     "합성 보고서 과제",
   );

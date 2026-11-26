@@ -460,3 +460,131 @@ details > summary {
     bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
+
+/* 과제: five step cards and the eight lines as label / text rows */
+.panel ol.flow-steps,
+.flow-steps {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.flow-steps li {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-top: 3px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+.panel .flow-steps li b,
+.flow-steps li b {
+  display: block;
+  width: auto;
+  font-size: 12px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.flow-steps li span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.flow-steps .done.st-collect {
+  border-top-color: var(--st-collect);
+}
+.flow-steps .done.st-decide {
+  border-top-color: var(--st-decide);
+}
+.flow-steps .done.st-change {
+  border-top-color: var(--st-change);
+}
+.flow-steps .done.st-release {
+  border-top-color: var(--st-release);
+}
+.flow-steps .done.st-impact {
+  border-top-color: var(--st-impact);
+}
+@media (max-width: 560px) {
+  .panel ol.flow-steps,
+  .flow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.panel .case-study ol.case-lines {
+  list-style: none;
+  padding: 0;
+  gap: 0;
+}
+.case-study .case-lines li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.case-study .case-lines li:last-child {
+  border-bottom: 0;
+}
+.panel .case-study .case-lines li strong {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 성과: flow funnel */
+.panel ol.report-funnel,
+.report-funnel {
+  list-style: none;
+  margin: 8px 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.report-funnel li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 44px;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.fn-label {
+  color: var(--body);
+}
+.fn-track {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.fn-bar {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+}
+.fn-bar.st-collect {
+  background: var(--st-collect);
+}
+.fn-bar.st-decide {
+  background: var(--st-decide);
+}
+.fn-bar.st-release {
+  background: var(--st-release);
+}
+.fn-bar.st-impact {
+  background: var(--st-impact);
+}
+.panel .report-funnel li b,
+.report-funnel li b {
+  width: auto;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .report-funnel li {
+    grid-template-columns: 96px minmax(0, 1fr) 36px;
+  }
+}
