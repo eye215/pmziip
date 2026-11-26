@@ -4,7 +4,7 @@
  * user confirms them before anything is saved, and the original text is kept.
  * Instructions written inside the text are never executed; it is only read.
  */
-export const EXTRACT_VERSION = "req-rules-1";
+export const EXTRACT_VERSION = "req-rules-2";
 
 export type CandidateType =
   "bug" | "request" | "change" | "decision" | "question";
@@ -241,6 +241,21 @@ function titleOf(unit: string) {
 }
 
 /** Candidates in text order. Units without a matched rule are not candidates. */
+/**
+ * Notification/footer boilerplate that is never a requirement even though it
+ * contains words like "요청" or "추가" (Google Docs access mails, Figma/Jira
+ * footers, unsubscribe lines), and units that are mostly a link.
+ */
+const BOILERPLATE =
+  /문서의 소유자로서|액세스 권한을 (제공|부여)|님이 다음 문서에 대한 액세스|다음 문서에 대한 액세스를 요청|공동작업자 또는 뷰어로 추가|Google에서 보내는|알림 설정을 (변경|관리)하려면|알림을 받지 않으려면|수신\s?거부|발신 전용|unsubscribe|do ?not ?reply|you (are )?receiv(ed|ing) this|view in (figma|jira|notion|confluence)|open in (figma|docs|sheets|slides)|reply to this email|this email was sent|Google LLC|1600 Amphitheatre|이 (이메일|메일)은 .{0,40}(자동|발송)/i;
+
+export function isBoilerplate(unit: string): boolean {
+  if (BOILERPLATE.test(unit)) return true;
+  const links = unit.match(/https?:\/\/\S+/g) ?? [];
+  const linkChars = links.reduce((n, l) => n + l.length, 0);
+  return linkChars > 0 && linkChars / unit.replace(/\s/g, "").length > 0.5;
+}
+
 export function extractCandidates(text: string): Candidate[] {
   const clean = cleanMessage(text);
   const units = splitUnits(
@@ -248,6 +263,7 @@ export function extractCandidates(text: string): Candidate[] {
   );
   const out: Candidate[] = [];
   units.forEach((unit, i) => {
+    if (isBoilerplate(unit)) return;
     let best: { type: CandidateType; score: number } | null = null;
     let score = 0;
     const matched: string[] = [];
