@@ -11,6 +11,7 @@ import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
+import { CaseStudyView } from "./case-study-view";
 import {
   CoachCollectionNote,
   CoachProjectMetrics,
@@ -759,6 +760,7 @@ export function WorkspaceApp() {
                     </span>
                     <h3>{work.title}</h3>
                     <p>{work.problem || "문제 미정"}</p>
+                    <CaseStudyView work={work} state={state} />
                     <InitiativeDetails work={work} state={state} />
                     {!work.mergedInto && (
                       <div className="actions">
