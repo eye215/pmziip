@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   EXTRACT_VERSION,
   extractCandidates,
+  isTeamsPaste,
+  normalizeTeamsPaste,
   typeNames,
   type Candidate,
   type CandidateType,
@@ -131,7 +133,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
     if (!body) return;
     const ch = channels.find((c) => c.id === channel)!;
     const candidates = extractCandidates(body);
-    const first = body
+    const first = (isTeamsPaste(body) ? normalizeTeamsPaste(body) : body)
       .split("\n")
       .find((l) => l.trim())!
       .trim();

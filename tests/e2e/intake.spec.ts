@@ -112,6 +112,47 @@ test("paste → rule-based candidates → confirm → 원문 + 과제 drafts; du
   ).toBeDisabled();
 });
 
+test("Teams paste: name/time headers are dropped, original kept", async ({
+  page,
+}) => {
+  const teams = [
+    "김합성",
+    "오후 2:10",
+    "오늘 회의 수고하셨습니다",
+    "이합성",
+    "오후 2:11",
+    "시뮬레이션 결과 화면에서 다시하기 버튼이 안 돼요",
+    "편집됨",
+    "김합성",
+    "오후 2:12",
+    "다음 주까지 영어 음성 속도 조절 기능 필요합니다",
+  ].join("\n");
+  const intake = await openIntake(page);
+  await intake
+    .getByLabel("어디서 온 내용인가요")
+    .selectOption({ label: "Teams" });
+  await intake.getByLabel("붙여넣을 내용").fill(teams);
+  await intake.getByRole("button", { name: "요구사항 후보 찾기" }).click();
+  await expect(intake.getByRole("status").first()).toHaveText("1건 · 후보 2개");
+  const titles = intake.getByLabel("후보 제목");
+  await expect(titles.nth(0)).toHaveValue(
+    "시뮬레이션 결과 화면에서 다시하기 버튼이 안 돼요",
+  );
+  await expect(titles.nth(1)).toHaveValue(
+    "다음 주까지 영어 음성 속도 조절 기능 필요합니다",
+  );
+  await intake
+    .getByRole("button", { name: "수집함에 등록 (원문 1건)" })
+    .click();
+  await expect(intake.getByRole("status")).toContainText(
+    "원문 1건을 등록했습니다.",
+  );
+  const state = await stored(page);
+  expect(state.sources[0].sourceType).toBe("teams");
+  expect(state.sources[0].rawText).toBe(teams);
+  await noOverflow(page);
+});
+
 test("Gmail·Calendar export file: review, skip items without candidates, keep links", async ({
   page,
 }) => {
