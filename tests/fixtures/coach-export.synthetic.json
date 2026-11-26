@@ -1,0 +1,184 @@
+{
+  "format": "pmzip.coach-ga-export",
+  "formatVersion": 1,
+  "definitionVersion": "coach-ga4-1.2",
+  "definition": {
+    "mainEvent": "screen_view",
+    "mainScreen": "GALAXY_COACH_SCREEN",
+    "startEvent": "GALAXY_COACH_SIMULATION",
+    "doneEvent": "GALAXY_COACH_REPORT",
+    "scoreDimension": "customEvent:nsp_value",
+    "countryDimension": "countryId",
+    "salesCaseDimension": "customEvent:nsp_category"
+  },
+  "generatedAt": "2026-11-25T06:00:12.345Z",
+  "generator": {
+    "name": "coach-ga-export.gs",
+    "version": "1.0.0"
+  },
+  "propertyTimeZone": "Asia/Seoul",
+  "periods": [
+    {
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31",
+      "totals": {
+        "main": {
+          "users": 1000,
+          "count": 4000
+        },
+        "start": {
+          "users": 400,
+          "count": 900
+        },
+        "done": {
+          "users": 300,
+          "count": 620
+        }
+      },
+      "scores": {
+        "1": 20,
+        "2": 40,
+        "3": 100,
+        "4": 200,
+        "5": 240
+      },
+      "invalidScores": [
+        {
+          "value": "(not set)",
+          "count": 20
+        }
+      ],
+      "byCountry": {
+        "main": [
+          {
+            "key": "XA",
+            "users": 600,
+            "count": 2500
+          },
+          {
+            "key": "XB",
+            "users": 450,
+            "count": 1500
+          }
+        ],
+        "start": [
+          {
+            "key": "XA",
+            "users": 250,
+            "count": 600
+          },
+          {
+            "key": "XB",
+            "users": 180,
+            "count": 300
+          }
+        ],
+        "done": [
+          {
+            "key": "XA",
+            "users": 190,
+            "count": 420
+          },
+          {
+            "key": "XB",
+            "users": 130,
+            "count": 200
+          }
+        ]
+      },
+      "bySalesCase": {
+        "main": [
+          {
+            "key": "(not set)",
+            "users": 1000,
+            "count": 4000
+          }
+        ],
+        "start": [
+          {
+            "key": "switcher",
+            "users": 150,
+            "count": 300
+          },
+          {
+            "key": "upgrader",
+            "users": 160,
+            "count": 350
+          },
+          {
+            "key": "retention",
+            "users": 120,
+            "count": 250
+          }
+        ],
+        "done": [
+          {
+            "key": "switcher",
+            "users": 110,
+            "count": 200
+          },
+          {
+            "key": "upgrader",
+            "users": 120,
+            "count": 250
+          },
+          {
+            "key": "retention",
+            "users": 90,
+            "count": 170
+          }
+        ]
+      },
+      "quality": {
+        "thresholded": true,
+        "sampled": false,
+        "dataLossFromOtherRow": false,
+        "truncated": false,
+        "notes": []
+      }
+    },
+    {
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-24",
+      "totals": {
+        "main": {
+          "users": 0,
+          "count": 0
+        },
+        "start": {
+          "users": 0,
+          "count": 0
+        },
+        "done": {
+          "users": null,
+          "count": null
+        }
+      },
+      "scores": {
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null
+      },
+      "invalidScores": [],
+      "byCountry": {
+        "main": [],
+        "start": [],
+        "done": []
+      },
+      "bySalesCase": {
+        "main": [],
+        "start": [],
+        "done": []
+      },
+      "quality": {
+        "thresholded": false,
+        "sampled": false,
+        "dataLossFromOtherRow": false,
+        "truncated": false,
+        "notes": []
+      }
+    }
+  ]
+}

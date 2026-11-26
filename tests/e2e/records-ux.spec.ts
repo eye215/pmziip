@@ -359,7 +359,13 @@ test("detail labels are Korean while stored values and times stay unchanged", as
   expect(text).toContain(work.plannedAt);
   expect(text).toContain(state.audit.at(-1).at);
   await expect(card).toContainText("업무 상태와 측정 준비는 별도로 관리합니다");
-  await expect(card).not.toContainText("측정 준비: 미준비");
+  // Phase 2 adds a derived readiness summary beside the actions. The details
+  // themselves must still avoid the old hardcoded status.
+  const details = card.locator("details").first();
+  await expect(details).not.toContainText("측정 준비: 미준비");
+  await expect(
+    card.getByRole("button", { name: "측정 계획", exact: true }),
+  ).toBeVisible();
 });
 
 test("touch targets ≥44px, bottom menu reachable, save button not covered", async ({

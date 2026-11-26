@@ -1,0 +1,60 @@
+name: Development preview
+on:
+  push:
+    branches: [preview/development]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages-development-preview
+  cancel-in-progress: false
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: mcr.microsoft.com/playwright:v1.56.1-noble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run test:e2e
+      - run: npm run build
+        env:
+          PMZIP_STATIC_EXPORT: '1'
+      - name: Record preview version
+        run: node --input-type=module -e "import { writeFileSync } from 'node:fs'; writeFileSync('out/preview-version.json', JSON.stringify({commit:process.env.GITHUB_SHA,builtAt:new Date().toISOString()}));"
+      - run: npx playwright test --config playwright.preview.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-browser-evidence
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+  deploy:
+    needs: verify-and-build
+    if: github.ref == 'refs/heads/preview/development'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish development preview
+        id: deployment
+        uses: actions/deploy-pages@v4
