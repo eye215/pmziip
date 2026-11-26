@@ -75,13 +75,37 @@
 
 메일 관련 메뉴는 메일 계정으로 로그인한 상태에서 실행한다.
 
-## 3. Slack · Teams 자동 수집
+## 3. Slack 자동 수집 ([`Slack.gs`](../tools/apps-script/coach-ga-export/Slack.gs))
 
-워크스페이스·M365 관리자 승인이 필요해서 아직 자동 수집은 없다. 그동안에는 대화 내용을 복사해 1의 붙여넣기로 수집한다.
+1. api.slack.com/apps에서 **읽기 전용 새 앱**을 만든다(예: `PMZIP Intake`). 이미 여러 채널에 들어가 있는 기존 앱의 권한을 넓히지 않는다.
+2. Bot Token Scopes에 `channels:history`, `channels:read`, `groups:history`, `groups:read`를 추가한다. 워크스페이스에 설치하고 Bot User OAuth Token(`xoxb-…`)을 복사한다.
+3. 스크립트 속성에 `SLACK_BOT_TOKEN`을 넣는다. 토큰은 채팅·저장소·시트에 쓰지 않는다.
+4. 시트 메뉴 **PM.zip → Slack 채널 설정**에서 채널 이름을 쉼표로 입력한다.
+5. 각 채널에 `/invite @PMZIP Intake`로 봇을 초대한다.
+6. 수집 결과는 Gmail·캘린더와 함께 `pmzip_inbox` 탭과 PM.zip 요구사항 수집에 **Slack**으로 표시된다. 매일 07시대 트리거(`installInboxTrigger`)나 메뉴 "요구사항 메일 지금 가져오기"로 갱신한다.
+
+수집 규칙은 다음과 같다.
+
+- 사람이 쓴 최상위 메시지마다 한 건으로 묶고, 스레드 답글을 함께 붙인다.
+- 봇 메시지(통계 보고 등)와 입장·퇴장 알림은 뺀다.
+- 멘션은 "@사용자"로, 링크는 "텍스트 (주소)"로 바꾼다.
+- 원문 링크는 Slack 메시지 permalink를 쓴다.
+- 공유 시트에 쓸 때는 이메일 주소와 전화번호를 가린다.
+- 토큰은 요청 헤더에만 쓰고 결과물에 남기지 않는다(테스트로 확인).
+
+## 4. Teams
+
+관리자 동의가 필요한 Graph API 대신, 회사 M365에 Power Automate가 있으면 다음 흐름으로 메일 수집 경로를 그대로 탄다.
+
+1. 흐름을 만든다: "채널에 새 메시지 → `[Teams]` 제목으로 메일 보내기"
+2. Gmail 필터에 `subject:[Teams]` → `PMZIP` 라벨을 추가한다.
+
+고객사 Teams에 게스트로 들어가 있는 경우에는 붙여넣기를 쓴다.
 
 ## 검증
 
 - 단위: 추출 규칙(메일, 대화 로그, 영어, 신호 없음, 기한)과 `Inbox.gs` 실제 코드를 가짜 Gmail·Calendar로 실행해 계약을 확인했다. 도메인만 남는지, 메모 없는 일정은 빠지는지도 확인했다.
 - e2e: 붙여넣기 → 후보 → 원문과 과제 초안 등록(원문 보존, 단일 저장) → 중복 차단을 확인했다. 파일 가져오기 → 후보 없는 메일 제외 → 링크 보존 → 같은 파일 재선택 시 중복 표시도 확인했다.
 - 공유 시트 경로: `Inbox.gs` 실제 코드로 인용·서명이 제거되고 이메일·전화번호가 가려지는지 단위 테스트로 확인했다. e2e에서 시트 읽기 → 등록 → 다시 읽을 때 중복 표시까지 확인했다.
-- 미검증: 실제 Gmail·Calendar 권한(`gmail.readonly`, `calendar.readonly`)으로 Apps Script를 실행하는 것, 실제 메일·회의록에서 규칙 품질이 어떤지.
+- Slack: `Slack.gs`를 가짜 Slack API로 실행해 채널 이름 → ID 변환(페이지 넘김 포함), 봇·입장 메시지 제외, 스레드 답글, 멘션·링크 변환, permalink, 공유 시트 가림 처리, 토큰 비노출을 확인했다.
+- 미검증: 실제 Slack 워크스페이스 호출, 실제 Gmail·Calendar 권한(`gmail.readonly`, `calendar.readonly`)으로 Apps Script를 실행하는 것, 실제 메일·회의록에서 규칙 품질이 어떤지.

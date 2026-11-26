@@ -10,6 +10,7 @@ function onOpen() {
     .addItem('가져올 Gmail 라벨 설정', 'pmzipSetInboxLabels')
     .addItem('Gmail 검색식으로 설정 (고급)', 'pmzipSetInboxQuery')
     .addItem('메일 가져올 기간(일) 설정', 'pmzipSetInboxDays')
+    .addItem('Slack 채널 설정', 'pmzipSetSlackChannels')
     .addSeparator()
     .addItem('요구사항 메일 지금 가져오기', 'pmzipRunInboxNow')
     .addItem('GA·공시·점유율 지금 갱신', 'dailyExport')
@@ -92,6 +93,24 @@ function pmzipSetInboxDays() {
   ui.alert('저장했습니다: 최근 ' + Math.round(n) + '일');
 }
 
+function pmzipSetSlackChannels() {
+  var ui = SpreadsheetApp.getUi();
+  var props = pmzipProps_();
+  var res = ui.prompt(
+    'Slack 채널',
+    '수집할 채널 이름을 쉼표로 입력하세요. 예: next-ai-technology-team, pj-넥삼플-운영dev\n' +
+      '봇을 각 채널에 /invite 해야 합니다. 토큰(SLACK_BOT_TOKEN)은 스크립트 속성에 넣으세요.\n현재: ' +
+      (props.getProperty('SLACK_CHANNELS') || '없음') +
+      ' · 토큰 ' + (props.getProperty('SLACK_BOT_TOKEN') ? '설정됨' : '없음'),
+    ui.ButtonSet.OK_CANCEL,
+  );
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+  var channels = res.getResponseText().split(',').map(function (s) { return s.trim().replace(/^#/, ''); }).filter(String);
+  if (channels.length) props.setProperty('SLACK_CHANNELS', channels.join(', '));
+  else props.deleteProperty('SLACK_CHANNELS');
+  ui.alert(channels.length ? '저장했습니다: ' + channels.join(', ') : 'Slack 수집을 껐습니다.');
+}
+
 function pmzipRunInboxNow() {
   var ui = SpreadsheetApp.getUi();
   var props = pmzipProps_();
@@ -118,6 +137,8 @@ function pmzipShowSettings() {
       '기간: 최근 ' + (p.getProperty('INBOX_DAYS') || '30') + '일\n' +
       '캘린더: 최근 ' + (p.getProperty('INBOX_CALENDAR_DAYS') || '14') + '일 (0이면 끔)\n' +
       '공유 시트 기록: ' + (p.getProperty('INBOX_SHEET') === 'on' ? '켜짐' : '꺼짐') + '\n' +
+      'Slack 채널: ' + (p.getProperty('SLACK_CHANNELS') || '없음') +
+        ' (토큰 ' + (p.getProperty('SLACK_BOT_TOKEN') ? '설정됨' : '없음') + ')\n' +
       'DART 회사: ' + (p.getProperty('DART_CORP_CODE') || '미설정') + '\n' +
       'StatCounter 국가: ' + (p.getProperty('STATCOUNTER_COUNTRIES')
         ? p.getProperty('STATCOUNTER_COUNTRIES').split(',').length + '개'
