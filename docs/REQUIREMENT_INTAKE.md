@@ -21,6 +21,7 @@
 
 - 글머리표(`-`, `1.`, `①` 등)가 있으면 줄 단위
 - 대화 로그(`[오후 2:10] 이름: …`)는 발화 단위
+- Teams에서 복사한 대화는 `이름 / 오후 2:10` 줄, `[오후 2:10] 이름` 줄, `이름, 2:10 PM` 줄, "편집됨"·반응 수 같은 줄을 빼고 메시지 단위로 나눈다. 시각 머리글이 2줄 이상일 때만 Teams 형식으로 본다.
 - 그 밖에는 문장 단위
 
 인용 답장(`>`), 전달·원본 메시지 머리글, `--` 아래 서명은 후보에서 제외한다. 원문에는 그대로 남는다.
@@ -77,11 +78,12 @@
 
 ## 3. Slack 자동 수집 ([`Slack.gs`](../tools/apps-script/coach-ga-export/Slack.gs))
 
-1. api.slack.com/apps에서 **읽기 전용 새 앱**을 만든다(예: `PMZIP Intake`). 이미 여러 채널에 들어가 있는 기존 앱의 권한을 넓히지 않는다.
-2. Bot Token Scopes에 `channels:history`, `channels:read`, `groups:history`, `groups:read`를 추가한다. 워크스페이스에 설치하고 Bot User OAuth Token(`xoxb-…`)을 복사한다.
+1. 이미 워크스페이스에 설치된 **기존 봇**을 쓴다. api.slack.com/apps에서 그 앱을 열고 **OAuth & Permissions → Bot Token Scopes**에 `channels:history`, `channels:read`, `groups:history`, `groups:read` 중 없는 것을 추가한다.
+2. 권한을 추가하면 Slack이 **재설치(Reinstall to Workspace)**를 요구한다. 재설치 후 Bot User OAuth Token(`xoxb-…`)을 복사한다. 기존 스크립트가 쓰는 토큰과 같은지 확인하고, 바뀌었다면 기존 스크립트의 속성도 함께 바꿔야 한다.
+   - 봇이 이미 들어가 있는 채널이 많아도, PM.zip은 `SLACK_CHANNELS`에 적은 채널만 읽는다.
 3. 스크립트 속성에 `SLACK_BOT_TOKEN`을 넣는다. 토큰은 채팅·저장소·시트에 쓰지 않는다.
 4. 시트 메뉴 **PM.zip → Slack 채널 설정**에서 채널 이름을 쉼표로 입력한다.
-5. 각 채널에 `/invite @PMZIP Intake`로 봇을 초대한다.
+5. 봇이 아직 없는 채널이면 `/invite @봇이름`으로 초대한다.
 6. 수집 결과는 Gmail·캘린더와 함께 `pmzip_inbox` 탭과 PM.zip 요구사항 수집에 **Slack**으로 표시된다. 매일 07시대 트리거(`installInboxTrigger`)나 메뉴 "요구사항 메일 지금 가져오기"로 갱신한다.
 
 수집 규칙은 다음과 같다.
@@ -93,14 +95,13 @@
 - 공유 시트에 쓸 때는 이메일 주소와 전화번호를 가린다.
 - 토큰은 요청 헤더에만 쓰고 결과물에 남기지 않는다(테스트로 확인).
 
-## 4. Teams
+## 4. Teams (붙여넣기)
 
-관리자 동의가 필요한 Graph API 대신, 회사 M365에 Power Automate가 있으면 다음 흐름으로 메일 수집 경로를 그대로 탄다.
+Teams는 자동 연결 없이 **붙여넣기**로 수집한다.
 
-1. 흐름을 만든다: "채널에 새 메시지 → `[Teams]` 제목으로 메일 보내기"
-2. Gmail 필터에 `subject:[Teams]` → `PMZIP` 라벨을 추가한다.
-
-고객사 Teams에 게스트로 들어가 있는 경우에는 붙여넣기를 쓴다.
+1. Teams에서 대화 메시지를 드래그로 선택해 복사한다.
+2. 요구사항 수집 → 붙여넣기 → "어디서 온 내용인가요"에서 **Teams**를 고르고 붙여넣는다.
+3. 이름·시각 머리글과 "편집됨" 줄은 후보에서 빠지고, 원문에는 복사한 그대로 남는다.
 
 ## 검증
 
