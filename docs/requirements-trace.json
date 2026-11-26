@@ -261,7 +261,7 @@
     "tests": [
       "T30"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F31",
@@ -269,7 +269,7 @@
     "tests": [
       "T31"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F32",
@@ -277,7 +277,7 @@
     "tests": [
       "T32"
     ],
-    "status": "planned"
+    "status": "local-verified"
   },
   {
     "id": "F33",
@@ -285,7 +285,7 @@
     "tests": [
       "T33"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F34",
@@ -325,7 +325,7 @@
     "tests": [
       "T38"
     ],
-    "status": "planned"
+    "status": "partial"
   },
   {
     "id": "F39",
