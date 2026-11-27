@@ -86,6 +86,37 @@ export function HomeFlow({
     .map((c) => c.lines.find((l) => l.key === "result")?.text ?? "")
     .find((t) => t.includes("횟수 완료율"));
   const highlight = best?.match(/횟수 완료율 [^·]+/)?.[0] ?? null;
+  if (
+    state.sources.length === 0 &&
+    state.initiatives.filter((w) => !w.mergedInto).length === 0
+  )
+    return (
+      <section className="onboard" aria-labelledby="onboard-h">
+        <p className="onboard-k">아직 기록이 없습니다</p>
+        <h2 id="onboard-h">요구사항 하나로 시작해 보세요</h2>
+        <ol className="onboard-steps">
+          <li className="st-collect">
+            <b>수집</b>메일·메신저 내용을 붙여넣어 원문으로 보관
+          </li>
+          <li className="st-decide">
+            <b>결정</b>할지 말지, 언제 할지 사유와 함께 기록
+          </li>
+          <li className="st-release">
+            <b>배포</b>바뀐 점과 배포일을 적으면 전후 비교
+          </li>
+          <li className="st-impact">
+            <b>성과</b>기간을 골라 성과 보고서로 확정
+          </li>
+        </ol>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => go({ tab: "inbox" })}
+        >
+          첫 원문 붙여넣기
+        </button>
+      </section>
+    );
   return (
     <>
       <section className="home-flow" aria-labelledby="home-flow-h">

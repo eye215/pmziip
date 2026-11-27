@@ -1393,3 +1393,54 @@ p.clamp-2 {
 #set-backup {
   scroll-margin-top: 16px;
 }
+
+/* Empty states: guidance instead of rows of zeros */
+.onboard {
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.onboard-k {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.onboard h2 {
+  font-size: 20px;
+  margin: 2px 0 12px;
+}
+.panel ol.onboard-steps,
+.onboard-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--body);
+}
+.onboard-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  border-left: 3px solid var(--st);
+}
+.onboard-steps b {
+  flex: none;
+  width: 2.6em;
+  color: var(--st);
+}
+.empty-card {
+  margin: 8px 0 12px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--sunken);
+  color: var(--body);
+  font-size: 14px;
+  text-align: center;
+}
