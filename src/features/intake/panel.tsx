@@ -18,6 +18,7 @@ import {
   inboxExportSchema,
   parseInboxExport,
   type InboxExport,
+  type InboxAttachment,
 } from "../../lib/connectors/inbox-export";
 import {
   joinSheetChunks,
@@ -56,12 +57,25 @@ type Message = {
   domain: string | null;
   /** Collected channel; null for pasted text (never filtered). */
   channel: "gmail" | "slack" | "calendar" | null;
-  candidates: Candidate[];
+  /** Candidates; origin = attachment name when found in an attachment. */
+  candidates: (Candidate & { origin?: string })[];
+  /** Mail attachments with extracted text (Inbox.gs ≥1.6.0). */
+  attachments: InboxAttachment[];
 };
 type Pick = {
   source: boolean;
   candidates: Record<string, { on: boolean; title: string }>;
 };
+
+/** Original text kept as 원문: body, then each attachment under its name. */
+function withAttachments(m: { body: string; attachments: InboxAttachment[] }) {
+  return [
+    m.body,
+    ...m.attachments
+      .filter((a) => a.text)
+      .map((a) => `[첨부: ${a.name}]\n${a.text}`),
+  ].join("\n\n");
+}
 
 const channels: { id: string; label: string; type: SourceType }[] = [
   { id: "kakao", label: "카카오톡·메신저", type: "other" },
@@ -181,6 +195,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         auto: null,
         domain: null,
         channel: null,
+        attachments: [],
         candidates,
       },
     ]);
@@ -209,6 +224,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         duplicate: isDuplicate(it.body || it.title, it.link),
         domain: it.fromDomain ? it.fromDomain.replace(/^@/, "") : null,
         channel: it.channel,
+        attachments: it.attachments,
         ...(() => {
           const auto = autoNoticeReason(it);
           // Notifications keep their original but propose no requirement.
@@ -216,7 +232,19 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
             auto,
             candidates: auto
               ? []
-              : extractCandidates(`${it.title}\n\n${it.body}`),
+              : [
+                  ...extractCandidates(`${it.title}\n\n${it.body}`),
+                  // Attachment text is a separate unit; keys stay unique.
+                  ...it.attachments.flatMap((a, i) =>
+                    a.text
+                      ? extractCandidates(a.text).map((c) => ({
+                          ...c,
+                          key: `a${i}:${c.key}`,
+                          origin: a.name,
+                        }))
+                      : [],
+                  ),
+                ],
           };
         })(),
       })),
@@ -311,7 +339,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
             type: "source.save",
             data: {
               title: m.title.trim() || "(제목 없음)",
-              rawText: m.body.slice(0, 100000),
+              rawText: withAttachments(m).slice(0, 100000),
               sourceType: m.sourceType,
               reference: m.reference,
               collectedAt: m.collectedAt,
@@ -589,6 +617,17 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                       </span>
                     </span>
                   </label>
+                  {m.attachments.length > 0 && (
+                    <p className="subtle intake-attach">
+                      첨부{" "}
+                      {m.attachments
+                        .map(
+                          (x) =>
+                            `${x.name} (${x.note ?? `${x.text.length.toLocaleString("ko-KR")}자`})`,
+                        )
+                        .join(" · ")}
+                    </p>
+                  )}
                   {m.candidates.length && !rule ? (
                     <ul className="intake-candidates">
                       {m.candidates.map((c) => {
@@ -620,6 +659,11 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                               <span className={`intake-type intake-${c.type}`}>
                                 {typeNames[c.type]}
                               </span>
+                              {c.origin && (
+                                <span className="intake-origin">
+                                  첨부 {c.origin}
+                                </span>
+                              )}
                             </label>
                             <input
                               className="intake-title"

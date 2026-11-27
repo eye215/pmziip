@@ -7,6 +7,16 @@ import { z } from "zod";
  * browser only. Sender is reduced to a domain (no names or addresses).
  */
 export const INBOX_FORMAT = "pmzip.inbox-export";
+const attachment = z
+  .object({
+    name: z.string().max(200),
+    mimeType: z.string().max(120),
+    /** Extracted text (Inbox.gs ≥1.6.0); "" when it could not be read. */
+    text: z.string().max(8000),
+    note: z.string().max(200).nullable(),
+  })
+  .strict();
+export type InboxAttachment = z.infer<typeof attachment>;
 const item = z
   .object({
     channel: z.enum(["gmail", "calendar", "slack"]),
@@ -19,6 +29,8 @@ const item = z
       .string()
       .max(2000)
       .refine((s) => /^https:\/\//.test(s), "https 링크여야 합니다."),
+    // Older exports have no attachments.
+    attachments: z.array(attachment).max(5).default([]),
   })
   .strict();
 export const inboxExportSchema = z
