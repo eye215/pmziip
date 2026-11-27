@@ -7,6 +7,7 @@ import {
 import { loadReports, reportKey } from "../report/model";
 import { loadSegments, segmentStorageKey } from "../segment-fin/store";
 import { loadRules, rulesKey } from "../intake/rules-store";
+import { coachDbKey, loadCoachDb } from "../coach-db/store";
 
 /**
  * Records sync through the user's own PMZIP spreadsheet (Apps Script web app,
@@ -18,7 +19,13 @@ import { loadRules, rulesKey } from "../intake/rules-store";
  */
 export type Session = { ownerId: string; workspaceId: string };
 export const SYNC_FORMAT = "pmzip.records-sync";
-export const syncItems = ["records", "reports", "segments", "rules"] as const;
+export const syncItems = [
+  "records",
+  "reports",
+  "segments",
+  "rules",
+  "coachDb",
+] as const;
 export type SyncItem = (typeof syncItems)[number];
 
 const keyOf = (item: SyncItem, s: Session) =>
@@ -28,7 +35,9 @@ const keyOf = (item: SyncItem, s: Session) =>
       ? reportKey(s)
       : item === "segments"
         ? segmentStorageKey(s)
-        : rulesKey(s);
+        : item === "rules"
+          ? rulesKey(s)
+          : coachDbKey(s);
 
 export const bundleSchema = z
   .object({
@@ -41,6 +50,8 @@ export const bundleSchema = z
         segments: z.string().max(1_000_000).nullable(),
         // Added later: bundles from older app versions have no rules.
         rules: z.string().max(200_000).nullable().default(null),
+        // Coach DB monthly aggregates (no user ids).
+        coachDb: z.string().max(6_000_000).nullable().default(null),
       })
       .strict(),
   })
@@ -60,7 +71,8 @@ export const bundleText = (b: Bundle) =>
 
 /** True when nothing worth keeping is stored (fresh device). */
 export function isEmptyBundle(b: Bundle, s: Session) {
-  if (b.items.reports || b.items.segments || b.items.rules) return false;
+  if (b.items.reports || b.items.segments || b.items.rules || b.items.coachDb)
+    return false;
   if (!b.items.records) return true;
   try {
     const st = loadLocal(memory({ [keyOf("records", s)]: b.items.records }), {
@@ -95,6 +107,7 @@ export function validateBundle(raw: unknown, s: Session): Bundle {
   if (b.items.reports !== null) loadReports(store, s);
   if (b.items.segments !== null) loadSegments(store, s);
   if (b.items.rules !== null) loadRules(store, s);
+  if (b.items.coachDb !== null) loadCoachDb(store, s);
   return b;
 }
 
