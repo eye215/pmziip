@@ -86,6 +86,22 @@ test("paste → rule-based candidates → confirm → 원문 + 과제 drafts; du
   const state = await stored(page);
   expect(state.sources).toHaveLength(1);
   expect(state.sources[0].rawText).toBe(chat); // original kept exactly
+
+  // With sources present, quick capture starts folded and opens on demand.
+  await page.reload();
+  await page
+    .getByRole("navigation", { name: "워크스페이스 메뉴" })
+    .getByRole("button", { name: "수집함", exact: true })
+    .click();
+  const quick = page.getByRole("button", { name: "빠른 수집", exact: true });
+  await expect(quick).toHaveAttribute("aria-expanded", "false");
+  await expect(intake).toHaveCount(0);
+  await expect(
+    page.getByRole("article", { name: /원문$/ }).first(),
+  ).toBeVisible();
+  await quick.click();
+  await expect(intake).toBeVisible();
+  await expect(quick).toHaveAttribute("aria-expanded", "true");
   expect(
     state.initiatives.map(
       (w: { title: string; status: string; category: string }) => [
