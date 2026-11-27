@@ -1294,3 +1294,102 @@ p.clamp-2 {
   background: var(--ink);
   color: #fff;
 }
+
+/* 설정 v2: connection rows as cards linking to each section (mock m5) */
+.panel.conn-status {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 28px;
+}
+.conn-status h2 {
+  font-size: 17px;
+  margin: 0 4px 10px;
+}
+.conn-status ul.set-rows {
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.conn-status ul.set-rows li {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--ink);
+}
+.set-row:hover {
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    var(--shadow);
+}
+.set-row.set-warn {
+  box-shadow:
+    inset 0 0 0 1.5px #f2c27a,
+    var(--shadow);
+}
+.set-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--soft);
+  color: var(--accent);
+}
+.set-off .set-icon,
+.set-info .set-icon {
+  background: var(--sunken);
+  color: var(--body);
+}
+.set-ok .set-icon {
+  background: #e3f6ef;
+  color: #127a5c;
+}
+.set-warn .set-icon {
+  background: #fcf1e1;
+  color: #9a6512;
+}
+.set-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+.set-text strong {
+  font-size: 15px;
+}
+.set-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.set-ok .set-state {
+  color: #127a5c;
+}
+.set-warn .set-state {
+  color: #9a6512;
+}
+.set-go {
+  color: var(--muted);
+  font-size: 20px;
+}
+.set-anchor {
+  scroll-margin-top: 16px;
+}
+#set-backup {
+  scroll-margin-top: 16px;
+}

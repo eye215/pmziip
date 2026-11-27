@@ -37,6 +37,10 @@ test("impact report: period draft, finalize once as a snapshot, survives reload"
 
   await tab(page, "성과");
   const panel = page.getByRole("region", { name: "내 성과 보고서" });
+  await panel
+    .getByRole("group", { name: "기간" })
+    .getByRole("button", { name: "직접 고르기" })
+    .click();
   await panel.getByLabel("시작 월", { exact: true }).fill("2026-11");
   await panel.getByLabel("끝 월", { exact: true }).fill("2026-11");
   const released = panel.locator(".report-summary div").filter({

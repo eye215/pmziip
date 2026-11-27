@@ -151,12 +151,28 @@ function CopyButton({ text }: { text: string }) {
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
+/** Quick periods ending at the current month: month, second half, year. */
+export function periodChoices(now: string) {
+  const y = now.slice(0, 4);
+  const secondHalf = Number(now.slice(5, 7)) >= 7;
+  return [
+    { key: "month", label: "이번 달", from: now, to: now },
+    // In January–June the first half is the same as the year so far.
+    ...(secondHalf
+      ? [{ key: "half", label: "하반기", from: `${y}-07`, to: now }]
+      : []),
+    { key: "year", label: "올해", from: `${y}-01`, to: now },
+  ];
+}
+
 /** "내 성과 보고서": live draft for a period, then an immutable snapshot. */
 export function ReportPanel({ state }: { state: RecordsState }) {
   const ids = useId();
   const timeZone = state.workspace.projects[0]?.timezone || "Asia/Seoul";
   const [from, setFrom] = useState(() => `${thisMonth().slice(0, 4)}-01`);
   const [to, setTo] = useState(thisMonth);
+  const [custom, setCustom] = useState(false);
+  const periods = useMemo(() => periodChoices(thisMonth()), []);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<Report[]>(() => {
@@ -204,26 +220,53 @@ export function ReportPanel({ state }: { state: RecordsState }) {
         기간 안에 수집·결정·배포한 기록과 과제별 케이스 스터디를 모읍니다. 기준
         시간대 {timeZone}. 지표 변화는 관찰값이며 원인으로 단정하지 않습니다.
       </p>
-      <div className="field-grid">
-        <div className="field">
-          <label htmlFor={`${ids}-from`}>시작 월</label>
-          <input
-            id={`${ids}-from`}
-            type="month"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor={`${ids}-to`}>끝 월</label>
-          <input
-            id={`${ids}-to`}
-            type="month"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </div>
+      <div className="status-chips" role="group" aria-label="기간">
+        {periods.map((pr) => (
+          <button
+            key={pr.key}
+            type="button"
+            aria-pressed={!custom && from === pr.from && to === pr.to}
+            onClick={() => {
+              setCustom(false);
+              setFrom(pr.from);
+              setTo(pr.to);
+            }}
+          >
+            {pr.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-pressed={
+            custom || !periods.some((pr) => pr.from === from && pr.to === to)
+          }
+          onClick={() => setCustom(true)}
+        >
+          직접 고르기
+        </button>
       </div>
+      {(custom || !periods.some((pr) => pr.from === from && pr.to === to)) && (
+        <div className="field-grid">
+          <div className="field">
+            <label htmlFor={`${ids}-from`}>시작 월</label>
+            <input
+              id={`${ids}-from`}
+              type="month"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor={`${ids}-to`}>끝 월</label>
+            <input
+              id={`${ids}-to`}
+              type="month"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
       {typeof draft === "string" ? (
         <p role="alert" className="error-box">
           {draft}
