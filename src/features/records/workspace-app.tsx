@@ -118,9 +118,10 @@ export function WorkspaceApp() {
     ) || [];
   let queryError = "";
   let works: ReturnType<typeof queryInitiatives> = [];
+  let anyStatus: ReturnType<typeof queryInitiatives> = [];
   if (state)
     try {
-      works = queryInitiatives(state, {
+      const query = {
         projectId: scopeKind === "project" ? scopeId : undefined,
         clientId: scopeKind === "client" ? scopeId : undefined,
         role,
@@ -131,8 +132,12 @@ export function WorkspaceApp() {
           view.get("range") === "1" ? view.get("to") || undefined : undefined,
         undated: view.get("undated") === "1",
         search: q,
-        status: view.get("status") || undefined,
         showArchived: archived,
+      };
+      anyStatus = queryInitiatives(state, query);
+      works = queryInitiatives(state, {
+        ...query,
+        status: view.get("status") || undefined,
       });
     } catch (e) {
       queryError =
@@ -642,6 +647,35 @@ export function WorkspaceApp() {
                   >
                     과제 추가
                   </button>
+                </div>
+                <div
+                  className="status-chips"
+                  role="group"
+                  aria-label="상태 빠른 선택"
+                >
+                  {(
+                    [
+                      ["", "전체"],
+                      ["draft", "결정 대기"],
+                      ["approved", "하기로 결정"],
+                      ["in_progress", "진행 중"],
+                      ["released", "배포"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id || "all"}
+                      type="button"
+                      aria-pressed={(view.get("status") || "") === id}
+                      onClick={() => navigate({ status: id })}
+                    >
+                      {label}{" "}
+                      <span className="chip-n">
+                        {id
+                          ? anyStatus.filter((w) => w.status === id).length
+                          : anyStatus.length}
+                      </span>
+                    </button>
+                  ))}
                 </div>
                 <div className="work-filters">
                   <div className="field">
