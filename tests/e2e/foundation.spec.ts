@@ -20,6 +20,10 @@ test("synthetic workspace is honest, scoped, responsive, and makes no external r
   await expect(
     page.getByText("합성 데이터 · 운영 미연결", { exact: true }),
   ).toBeVisible();
+  // Empty workspace: guidance instead of rows of zeros.
+  await expect(
+    page.getByRole("region", { name: "요구사항 하나로 시작해 보세요" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Demo Coach", exact: true }),
   ).toBeVisible();

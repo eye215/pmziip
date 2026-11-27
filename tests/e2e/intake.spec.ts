@@ -128,6 +128,17 @@ test("paste → rule-based candidates → confirm → 원문 + 과제 drafts; du
   ).toBeDisabled();
 });
 
+test("empty home leads to quick capture, already open", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "첫 원문 붙여넣기" }).click();
+  await expect(
+    page.getByRole("region", { name: "요구사항 수집" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "빠른 수집", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+});
+
 test("Teams paste: name/time headers are dropped, original kept", async ({
   page,
 }) => {

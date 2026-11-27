@@ -43,6 +43,13 @@ export function observeFor(state: RecordsState) {
 }
 
 function ReportBody({ r }: { r: ReportContent }) {
+  if (Object.values(r.summary).every((v) => v === 0))
+    return (
+      <p className="empty-card">
+        이 기간에는 수집·결정·배포 기록이 없습니다. 다른 기간을 고르거나,
+        수집함에서 원문을 먼저 모아 주세요.
+      </p>
+    );
   return (
     <>
       <div className="report-hero">
@@ -276,7 +283,12 @@ export function ReportPanel({ state }: { state: RecordsState }) {
           <h3>미리보기 (확정 전)</h3>
           <ReportBody r={draft} />
           <div className="actions">
-            <button type="button" className="primary commit" onClick={finalize}>
+            <button
+              type="button"
+              className="primary commit"
+              disabled={Object.values(draft.summary).every((v) => v === 0)}
+              onClick={finalize}
+            >
               이 내용으로 확정
             </button>
             <CopyButton text={reportText(draft)} />
