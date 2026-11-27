@@ -58,7 +58,8 @@ export function WorkspaceApp() {
   const [editor, setEditor] = useState<Editor | null>(null),
     [notice, setNotice] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
-    [intakeOpen, setIntakeOpen] = useState<boolean | null>(null);
+    [intakeOpen, setIntakeOpen] = useState<boolean | null>(null),
+    [filtersOpen, setFiltersOpen] = useState<boolean | null>(null);
   const tab = view.get("tab") || "projects",
     scope = view.get("scope") || "all",
     month = view.get("month") || "2026-11",
@@ -190,6 +191,11 @@ export function WorkspaceApp() {
   if (state && intakeOpen === null)
     setIntakeOpen(!state.sources.some((x) => x.status !== "archived"));
   const showIntake = intakeOpen ?? false;
+  const activeFilters =
+    (role !== "collected" ? 1 : 0) +
+    (view.get("undated") === "1" ? 1 : 0) +
+    (view.get("range") === "1" ? 1 : 0);
+  const showFilters = filtersOpen ?? activeFilters > 0;
   const freshCount =
     state?.sources.filter((s) => s.status === "inbox").length ?? 0;
 
@@ -608,7 +614,7 @@ export function WorkspaceApp() {
               </div>
             )}
             {tab === "inbox" && (
-              <section className="panel">
+              <section className="panel list-panel">
                 <div className="section-heading">
                   <h2>수집한 원문</h2>
                   <button className="primary" onClick={() => open("source")}>
@@ -722,7 +728,7 @@ export function WorkspaceApp() {
               </section>
             )}
             {tab === "work" && (
-              <section className="panel">
+              <section className="panel list-panel">
                 <div className="section-heading">
                   <h2>과제 목록</h2>
                   <button
@@ -760,100 +766,113 @@ export function WorkspaceApp() {
                       </span>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    className="filter-button"
+                    aria-expanded={showFilters}
+                    aria-controls="work-filter-sheet"
+                    onClick={() => setFiltersOpen(!showFilters)}
+                  >
+                    필터{activeFilters ? ` ${activeFilters}` : ""}
+                  </button>
                 </div>
-                <div className="work-filters">
-                  <div className="field">
-                    <label htmlFor="month-role">월 기준</label>
-                    <select
-                      id="month-role"
-                      value={role}
-                      onChange={(e) => navigate({ role: e.target.value })}
-                    >
-                      <option value="collected">수집월</option>
-                      <option value="planned">기획월</option>
-                      <option value="target">목표월</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="work-filter-status">상태</label>
-                    <select
-                      id="work-filter-status"
-                      value={view.get("status") || ""}
-                      onChange={(e) => navigate({ status: e.target.value })}
-                    >
-                      <option value="">전체 상태</option>
-                      {Object.entries(statusNames)
-                        .filter(([id]) =>
-                          [
-                            "draft",
-                            "approved",
-                            "planned",
-                            "in_progress",
-                            "released",
-                            "archived",
-                            "canceled",
-                          ].includes(id),
-                        )
-                        .map(([id, label]) => (
-                          <option key={id} value={id}>
-                            {label}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="actions">
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={view.get("undated") === "1"}
-                      onChange={(e) =>
-                        navigate({ undated: e.target.checked ? "1" : "" })
-                      }
-                    />
-                    선택한 기준의 날짜 미정만
-                  </label>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={view.get("range") === "1"}
-                      onChange={(e) =>
-                        navigate({
-                          range: e.target.checked ? "1" : "",
-                          from: month,
-                          to: month,
-                        })
-                      }
-                    />
-                    월 범위로 조회
-                  </label>
-                </div>
-                {view.get("range") === "1" && (
-                  <div className="field-grid">
-                    <label className="field" htmlFor="month-from">
-                      시작 월
-                      <input
-                        id="month-from"
-                        type="month"
-                        value={view.get("from") || ""}
-                        onChange={(e) => navigate({ from: e.target.value })}
-                      />
-                    </label>
-                    <label className="field" htmlFor="month-to">
-                      종료 월
-                      <input
-                        id="month-to"
-                        type="month"
-                        value={view.get("to") || ""}
-                        onChange={(e) => navigate({ to: e.target.value })}
-                      />
-                    </label>
+                {showFilters && (
+                  <div id="work-filter-sheet" className="filter-sheet">
+                    <div className="work-filters">
+                      <div className="field">
+                        <label htmlFor="month-role">월 기준</label>
+                        <select
+                          id="month-role"
+                          value={role}
+                          onChange={(e) => navigate({ role: e.target.value })}
+                        >
+                          <option value="collected">수집월</option>
+                          <option value="planned">기획월</option>
+                          <option value="target">목표월</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="work-filter-status">상태</label>
+                        <select
+                          id="work-filter-status"
+                          value={view.get("status") || ""}
+                          onChange={(e) => navigate({ status: e.target.value })}
+                        >
+                          <option value="">전체 상태</option>
+                          {Object.entries(statusNames)
+                            .filter(([id]) =>
+                              [
+                                "draft",
+                                "approved",
+                                "planned",
+                                "in_progress",
+                                "released",
+                                "archived",
+                                "canceled",
+                              ].includes(id),
+                            )
+                            .map(([id, label]) => (
+                              <option key={id} value={id}>
+                                {label}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="actions">
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={view.get("undated") === "1"}
+                          onChange={(e) =>
+                            navigate({ undated: e.target.checked ? "1" : "" })
+                          }
+                        />
+                        선택한 기준의 날짜 미정만
+                      </label>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={view.get("range") === "1"}
+                          onChange={(e) =>
+                            navigate({
+                              range: e.target.checked ? "1" : "",
+                              from: month,
+                              to: month,
+                            })
+                          }
+                        />
+                        월 범위로 조회
+                      </label>
+                    </div>
+                    {view.get("range") === "1" && (
+                      <div className="field-grid">
+                        <label className="field" htmlFor="month-from">
+                          시작 월
+                          <input
+                            id="month-from"
+                            type="month"
+                            value={view.get("from") || ""}
+                            onChange={(e) => navigate({ from: e.target.value })}
+                          />
+                        </label>
+                        <label className="field" htmlFor="month-to">
+                          종료 월
+                          <input
+                            id="month-to"
+                            type="month"
+                            value={view.get("to") || ""}
+                            onChange={(e) => navigate({ to: e.target.value })}
+                          />
+                        </label>
+                      </div>
+                    )}
+                    <p className="scope-note">
+                      배포월·관측월 기준은 실제 배포와 관측 기능 구현 후
+                      제공됩니다. 과제는 ID별 한 번만 셉니다.
+                    </p>
                   </div>
                 )}
-                <p className="scope-note">
-                  배포월·관측월 기준은 실제 배포와 관측 기능 구현 후 제공됩니다.
-                  과제는 ID별 한 번만 셉니다.
-                </p>
                 {queryError && (
                   <p role="alert" className="error-box">
                     {queryError}
@@ -878,16 +897,25 @@ export function WorkspaceApp() {
                     key={work.id}
                     aria-label={`${work.title} 과제`}
                   >
-                    <span className="badge">
-                      {statusNames[work.status]} ·{" "}
-                      {
-                        state.workspace.projects.find(
-                          (p) => p.id === work.projectId,
-                        )?.name
-                      }
-                    </span>
+                    <div className="tag-row">
+                      <span className={`tag tag-w-${work.status}`}>
+                        {statusNames[work.status]}
+                      </span>
+                      <span className="tag">
+                        {
+                          state.workspace.projects.find(
+                            (p) => p.id === work.projectId,
+                          )?.name
+                        }
+                      </span>
+                      {work.targetMonth && (
+                        <span className="tag-time">
+                          목표 {work.targetMonth}
+                        </span>
+                      )}
+                    </div>
                     <h3>{work.title}</h3>
-                    <p>{work.problem || "문제 미정"}</p>
+                    <p className="clamp-2">{work.problem || "문제 미정"}</p>
                     <CaseStudyView work={work} state={state} />
                     <InitiativeDetails work={work} state={state} />
                     {!work.mergedInto && (
