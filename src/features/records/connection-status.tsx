@@ -6,6 +6,7 @@ import { coachSourceKey, coachSourceSchema } from "../coach-data/store";
 import { finSourceKey, finSourceSchema } from "../public-financials/store";
 import { marketSourceKey, marketSourceSchema } from "../market-share/store";
 import { currentSegments, loadSegments } from "../segment-fin/store";
+import { loadSyncConfig } from "../sync/client";
 
 type Row = {
   name: string;
@@ -43,6 +44,18 @@ function row(name: string, src: Src, href: string, icon: string): Row {
     text: src.lastSyncAt ? `연결됨 · ${when(src.lastSyncAt)}` : "연결됨",
   };
 }
+function syncRow(): Row {
+  const base = { name: "기기 간 기록 동기화", href: "#set-sync", icon: "동기" };
+  const c = loadSyncConfig(window.localStorage, session);
+  if (!c) return { ...base, state: "off", text: "꺼짐 · 이 기기에만 저장" };
+  if (c.lastOk === false)
+    return { ...base, state: "warn", text: "마지막 동기화 실패 · 눌러서 확인" };
+  return {
+    ...base,
+    state: "ok",
+    text: c.lastSyncAt ? `동기화됨 · ${when(c.lastSyncAt)}` : "연결됨",
+  };
+}
 function segmentRow(): Row {
   const base = { name: "공개 부문 실적", href: "#set-seg", icon: "MX" };
   try {
@@ -72,6 +85,7 @@ function readRows(): Row[] {
       return r.success ? (r.data as T) : null;
     };
   return [
+    syncRow(),
     row(
       "Galaxy Coach GA",
       read(coachSourceKey(session), safe<Src>(coachSourceSchema)),

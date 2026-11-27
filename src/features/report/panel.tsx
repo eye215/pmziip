@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { Initiative, RecordsState } from "../records/model";
 import { runtime, session } from "../records/browser-store";
 import { dayIn } from "../records/case-study";
@@ -191,6 +191,17 @@ export function ReportPanel({ state }: { state: RecordsState }) {
       return [];
     }
   });
+  useEffect(() => {
+    const again = () => {
+      try {
+        setSaved(loadReports(window.localStorage, session).state.reports);
+      } catch {
+        // Keep what is shown.
+      }
+    };
+    window.addEventListener("pmzip:synced", again);
+    return () => window.removeEventListener("pmzip:synced", again);
+  }, []);
   const draft = useMemo(() => {
     try {
       return buildReport(state, from, to, timeZone, observeFor(state));
