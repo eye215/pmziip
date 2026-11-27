@@ -3,6 +3,7 @@ import {
   type FinRow,
 } from "../../lib/connectors/public-financials";
 import type { SharePoint } from "../../lib/connectors/market-share";
+import type { SegmentEntry } from "../segment-fin/store";
 
 /**
  * "비즈니스" line of a case study from PUBLIC sources only: the disclosed
@@ -14,6 +15,8 @@ export type PublicContext = {
   companies: { corpCode: string; corpName: string }[];
   finRows: FinRow[];
   share: SharePoint[];
+  /** Current hand-entered public segment results (e.g. MX/네트워크). */
+  segments?: SegmentEntry[];
 };
 
 export const BUSINESS_NOTE =
@@ -33,6 +36,35 @@ function prevMonth(m: string) {
   const y = Number(m.slice(0, 4));
   const mo = Number(m.slice(5, 7));
   return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
+}
+
+/** Segment line (MX first) for the release quarter; "" if not entered. */
+function segmentPart(day: string, ctx: PublicContext) {
+  const list = ctx.segments ?? [];
+  if (!list.length) return "";
+  const name =
+    list.find((e) => e.segment.toUpperCase().includes("MX"))?.segment ??
+    list[0].segment;
+  const year = Number(day.slice(0, 4));
+  const quarter = Math.ceil(Number(day.slice(5, 7)) / 3);
+  const of = (y: number) =>
+    list.find(
+      (e) => e.segment === name && e.year === y && e.quarter === quarter,
+    );
+  const row = of(year);
+  if (!row) return "";
+  const prev = of(year - 1)?.revenue ?? null;
+  const parts: string[] = [];
+  if (row.revenue !== null) {
+    const yoy =
+      prev === null || prev === 0
+        ? "전년 동기 비교 N/A"
+        : `전년 동기 대비 ${signed(((row.revenue - prev) / Math.abs(prev)) * 100, 1)}%`;
+    parts.push(`매출 ${won(row.revenue)}(${yoy})`);
+  }
+  if (row.operatingIncome !== null)
+    parts.push(`영업이익 ${won(row.operatingIncome)}`);
+  return `공개 실적 ${name} ${year}-Q${quarter} ${parts.join(", ")} · 출처 ${row.source}`;
 }
 
 function finPart(day: string, ctx: PublicContext) {
@@ -93,8 +125,10 @@ function sharePart(day: string, ctx: PublicContext) {
 /** releaseDay: YYYY-MM-DD in the project time zone. "" when nothing applies. */
 export function businessContext(releaseDay: string, ctx: PublicContext | null) {
   if (!ctx || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDay)) return "";
-  const parts = [finPart(releaseDay, ctx), sharePart(releaseDay, ctx)].filter(
-    Boolean,
-  );
+  // The segment (MX) figure replaces company-wide revenue when entered.
+  const parts = [
+    segmentPart(releaseDay, ctx) || finPart(releaseDay, ctx),
+    sharePart(releaseDay, ctx),
+  ].filter(Boolean);
   return parts.length ? `${parts.join(" · ")} (${BUSINESS_NOTE})` : "";
 }

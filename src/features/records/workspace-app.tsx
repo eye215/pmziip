@@ -9,6 +9,7 @@ import { CoachDataPanel } from "../coach-data/panel";
 import { DeviceLinkHandler, DeviceLinkPanel } from "../coach-data/device-link";
 import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
+import { SegmentFinPanel } from "../segment-fin/panel";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
@@ -987,6 +988,11 @@ export function WorkspaceApp() {
             {tab === "data" && (
               <div id="set-fin" className="set-anchor">
                 <PublicFinancialsPanel />
+              </div>
+            )}
+            {tab === "data" && (
+              <div id="set-seg" className="set-anchor">
+                <SegmentFinPanel />
               </div>
             )}
             {tab === "perf" && <ReportPanel state={state} />}
