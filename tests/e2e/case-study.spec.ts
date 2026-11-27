@@ -182,6 +182,28 @@ test("case study fields save on the initiative and show as eight lines", async (
   await expect(lines.nth(6)).toContainText("2026-Q4 매출: 공시 전");
   await expect(lines.nth(6)).toContainText("KR 62.0% (전월 대비 +1.0%p)");
   await expect(lines.nth(6)).toContainText("효과로 단정하지 않음");
+
+  // Hand-entered public segment figure (synthetic) replaces company revenue.
+  await tab(page, "설정");
+  const seg = page.getByRole("region", { name: "공개 부문 실적 (직접 입력)" });
+  await seg.getByLabel("연도", { exact: true }).fill("2026");
+  await seg.getByLabel("분기", { exact: true }).selectOption("4");
+  await seg.getByLabel("매출 (조원)", { exact: true }).fill("33.5");
+  await seg.getByRole("button", { name: "저장" }).click();
+  await expect(seg.getByRole("alert")).toContainText("출처");
+  await seg
+    .getByLabel("출처 (https 링크 또는 DART 접수번호)", { exact: true })
+    .fill("https://example.invalid/ir/2026q4");
+  await seg.getByRole("button", { name: "저장" }).click();
+  await expect(seg.getByRole("status")).toContainText(
+    "2026-Q4 값을 저장했습니다",
+  );
+  await expect(seg.getByRole("table")).toContainText("33.50조원");
+  await tab(page, "과제");
+  await card.getByText(/케이스 스터디 · \d\/8 작성/).click();
+  await expect(card.locator(".case-lines li").nth(6)).toContainText(
+    "공개 실적 MX/네트워크 2026-Q4 매출 33.5조원(전년 동기 비교 N/A)",
+  );
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

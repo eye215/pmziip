@@ -5,6 +5,7 @@ import { session } from "./browser-store";
 import { coachSourceKey, coachSourceSchema } from "../coach-data/store";
 import { finSourceKey, finSourceSchema } from "../public-financials/store";
 import { marketSourceKey, marketSourceSchema } from "../market-share/store";
+import { currentSegments, loadSegments } from "../segment-fin/store";
 
 type Row = {
   name: string;
@@ -42,6 +43,25 @@ function row(name: string, src: Src, href: string, icon: string): Row {
     text: src.lastSyncAt ? `연결됨 · ${when(src.lastSyncAt)}` : "연결됨",
   };
 }
+function segmentRow(): Row {
+  const base = { name: "공개 부문 실적", href: "#set-seg", icon: "MX" };
+  try {
+    const rows = currentSegments(
+      loadSegments(window.localStorage, session).state,
+    );
+    if (!rows.length) return { ...base, state: "off", text: "입력 없음" };
+    const last = rows.reduce((a, b) =>
+      a.year * 10 + a.quarter >= b.year * 10 + b.quarter ? a : b,
+    );
+    return {
+      ...base,
+      state: "ok",
+      text: `${rows.length}개 분기 · 최근 ${last.year}-Q${last.quarter}`,
+    };
+  } catch {
+    return { ...base, state: "warn", text: "기록을 읽지 못함 · 눌러서 확인" };
+  }
+}
 function readRows(): Row[] {
   const safe =
     <T,>(schema: {
@@ -64,6 +84,7 @@ function readRows(): Row[] {
       "#set-fin",
       "공시",
     ),
+    segmentRow(),
     row(
       "국가별 점유율",
       read(marketSourceKey(session), safe<Src>(marketSourceSchema)),
