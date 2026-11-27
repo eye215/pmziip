@@ -89,6 +89,7 @@ test("one source → two projects; scope/month filters, rename/move/archive and 
   await page
     .getByLabel("조회 범위", { exact: true })
     .selectOption("project:" + SURVEY);
+  await page.getByRole("button", { name: /^필터/ }).click();
   await page.getByLabel("월 기준", { exact: true }).selectOption("planned");
   await expect(page.getByText("과제 0개", { exact: true })).toBeVisible();
   await page.getByLabel("조회 월", { exact: true }).fill("2026-12");

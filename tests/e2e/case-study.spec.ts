@@ -20,6 +20,11 @@ async function tab(page: Page, name: string) {
     .click();
 }
 
+async function openFilters(page: Page) {
+  const b = page.getByRole("button", { name: /^필터/ });
+  if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
+}
+
 test("case study fields save on the initiative and show as eight lines", async ({
   page,
 }) => {
@@ -76,6 +81,7 @@ test("case study fields save on the initiative and show as eight lines", async (
   expect(w.releasedAt).toMatch(/^2026-11-20T/);
 
   // The list shows the current view month by target month.
+  await openFilters(page);
   await page.getByLabel("월 기준", { exact: true }).selectOption("target");
   const card = page
     .getByRole("article")
@@ -182,6 +188,7 @@ test("released Coach initiative shows GA before/after as observations", async ({
     .getByRole("button", { name: "확인하고 저장", exact: true })
     .click();
   await expect(page.locator(".editor")).toHaveCount(0);
+  await openFilters(page);
   await page.getByLabel("월 기준", { exact: true }).selectOption("target");
   const card = page
     .getByRole("article")
