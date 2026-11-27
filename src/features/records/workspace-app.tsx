@@ -56,7 +56,8 @@ export function WorkspaceApp() {
     search = useView(),
     view = new URLSearchParams(search);
   const [editor, setEditor] = useState<Editor | null>(null),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [searchOpen, setSearchOpen] = useState(false);
   const tab = view.get("tab") || "projects",
     scope = view.get("scope") || "all",
     month = view.get("month") || "2026-11",
@@ -172,6 +173,17 @@ export function WorkspaceApp() {
       return projectMonth(s.collectedAt, "Asia/Seoul") === month;
     }) || [];
 
+  const monthNum = Number(month.slice(5, 7)) || "";
+  const [pageTitle, pageSub] = (
+    {
+      projects: [`${monthNum}월의 흐름`, "이 브라우저에만 저장하는 합성 모드"],
+      inbox: ["수집함", "붙여넣기·시트에서 모은 원문"],
+      work: ["과제", "결정부터 배포·성과까지"],
+      measurement: ["측정 계획", "지표 정의와 승인 이력"],
+      perf: ["성과", "관찰값 · 원인으로 단정하지 않음"],
+      data: ["설정", "연결 정보는 이 브라우저에만"],
+    } as Record<string, [string, string]>
+  )[tab] ?? ["PM.zip", ""];
   const freshCount =
     state?.sources.filter((s) => s.status === "inbox").length ?? 0;
 
@@ -187,14 +199,36 @@ export function WorkspaceApp() {
         <span className="mode">합성 데이터 · 운영 미연결</span>
       </header>
       <main id="main">
-        <div className="intro">
-          <p className="eyebrow">PRODUCT IMPACT WORKSPACE</p>
-          <h1>제품의 변화, 근거와 함께</h1>
-          <p>
-            요구사항에서 배포, 그리고 성과 검증까지.
-            <br className="mobile-break" /> 프로젝트마다 다른 목표를 이어
-            봅니다.
-          </p>
+        <div className="page-head">
+          <div>
+            <h1>{pageTitle}</h1>
+            <p className="page-sub">{pageSub}</p>
+          </div>
+          {state && (tab === "inbox" || tab === "work") && (
+            <button
+              type="button"
+              className="icon-button"
+              aria-expanded={searchOpen || !!q}
+              aria-controls="record-search-row"
+              onClick={() => setSearchOpen(!(searchOpen || !!q))}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="m16 16 4 4" />
+              </svg>
+              <span className="visually-hidden">검색 열기</span>
+            </button>
+          )}
         </div>
         {!state ? (
           <section className="panel" aria-live="polite">
@@ -225,47 +259,6 @@ export function WorkspaceApp() {
           </section>
         ) : (
           <>
-            <p className="local-note">
-              이 브라우저에만 저장하는 합성 모드입니다. 실제 로그인·서버 저장은
-              지원하지 않습니다.
-            </p>
-            {tab !== "perf" && (
-              <section className="filters" aria-label="조회 조건">
-                <div>
-                  <label htmlFor="scope">조회 범위</label>
-                  <select
-                    id="scope"
-                    value={scope}
-                    onChange={(e) => navigate({ scope: e.target.value })}
-                  >
-                    <option value="all">전체 프로젝트</option>
-                    {state.workspace.clients.map((c) => (
-                      <option key={c.id} value={`client:${c.id}`}>
-                        {c.name}
-                        {c.archivedAt ? " (보관)" : ""}
-                      </option>
-                    ))}
-                    {state.workspace.projects.map((p) => (
-                      <option key={p.id} value={`project:${p.id}`}>
-                        {p.name}
-                        {p.archivedAt ? " (보관)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="month">조회 월</label>
-                  <input
-                    id="month"
-                    type="month"
-                    min="2000-01"
-                    max="2100-12"
-                    value={month}
-                    onChange={(e) => navigate({ month: e.target.value })}
-                  />
-                </div>
-              </section>
-            )}
             <nav className="workspace-nav" aria-label="워크스페이스 메뉴">
               {[
                 ["projects", "홈"],
@@ -293,9 +286,42 @@ export function WorkspaceApp() {
                 </button>
               ))}
             </nav>
-            {tab !== "perf" && (
-              <div className="toolbar">
-                <label className="check">
+            {tab !== "perf" && tab !== "data" && (
+              <section className="chip-bar" aria-label="조회 조건">
+                <label className="chip-field">
+                  <select
+                    id="scope"
+                    aria-label="조회 범위"
+                    value={scope}
+                    onChange={(e) => navigate({ scope: e.target.value })}
+                  >
+                    <option value="all">전체 프로젝트</option>
+                    {state.workspace.clients.map((c) => (
+                      <option key={c.id} value={`client:${c.id}`}>
+                        {c.name}
+                        {c.archivedAt ? " (보관)" : ""}
+                      </option>
+                    ))}
+                    {state.workspace.projects.map((p) => (
+                      <option key={p.id} value={`project:${p.id}`}>
+                        {p.name}
+                        {p.archivedAt ? " (보관)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="chip-field chip-month">
+                  <input
+                    id="month"
+                    aria-label="조회 월"
+                    type="month"
+                    min="2000-01"
+                    max="2100-12"
+                    value={month}
+                    onChange={(e) => navigate({ month: e.target.value })}
+                  />
+                </label>
+                <label className="check chip-toggle">
                   <input
                     type="checkbox"
                     checked={archived}
@@ -305,17 +331,21 @@ export function WorkspaceApp() {
                   />
                   보관 기록 포함
                 </label>
-                {(tab === "inbox" || tab === "work") && (
-                  <label className="search-label" htmlFor="record-search">
-                    검색
-                    <input
-                      id="record-search"
-                      type="search"
-                      value={q}
-                      onChange={(e) => navigate({ q: e.target.value })}
-                    />
-                  </label>
-                )}
+              </section>
+            )}
+            {(tab === "inbox" || tab === "work") && (searchOpen || !!q) && (
+              <div className="search-row" id="record-search-row">
+                <label className="visually-hidden" htmlFor="record-search">
+                  검색
+                </label>
+                <input
+                  id="record-search"
+                  type="search"
+                  placeholder="제목·내용 검색"
+                  autoFocus={!q}
+                  value={q}
+                  onChange={(e) => navigate({ q: e.target.value })}
+                />
               </div>
             )}
             {notice && (
@@ -544,7 +574,7 @@ export function WorkspaceApp() {
             {tab === "inbox" && (
               <section className="panel">
                 <div className="section-heading">
-                  <h2>수집함</h2>
+                  <h2>수집한 원문</h2>
                   <button className="primary" onClick={() => open("source")}>
                     원문 등록
                   </button>
@@ -640,7 +670,7 @@ export function WorkspaceApp() {
             {tab === "work" && (
               <section className="panel">
                 <div className="section-heading">
-                  <h2>과제</h2>
+                  <h2>과제 목록</h2>
                   <button
                     className="primary"
                     onClick={() => open("initiative")}
