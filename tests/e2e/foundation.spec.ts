@@ -15,7 +15,7 @@ test("synthetic workspace is honest, scoped, responsive, and makes no external r
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "제품의 변화, 근거와 함께" }),
+    page.getByRole("heading", { level: 1, name: "11월의 흐름" }),
   ).toBeVisible();
   await expect(
     page.getByText("합성 데이터 · 운영 미연결", { exact: true }),
