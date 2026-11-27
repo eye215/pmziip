@@ -58,6 +58,8 @@ export function caseStudy(
   state: RecordsState,
   /** Observed GA before/after line (release-compare), if any. */
   resultNote = "",
+  /** Public market context of the release (DART, StatCounter), if any. */
+  businessNote = "",
 ): CaseLine[] {
   const project = state.workspace.projects.find((p) => p.id === work.projectId);
   const zone = project?.timezone || "UTC";
@@ -139,8 +141,8 @@ export function caseStudy(
     {
       key: "business",
       label: "비즈니스",
-      // No product sales source is connected yet; never inferred.
-      text: "",
+      // Public disclosures / market share only; never inferred.
+      text: work.releasedAt ? businessNote : "",
     },
     {
       key: "retro",
@@ -161,7 +163,8 @@ const missingText: Record<CaseLine["key"], string> = {
   change: "바뀐 점과 기획서·사이트 링크를 적어 주세요.",
   hypothesis: "기대 변화, 예상 사용, 예상 막힘 지점을 적어 주세요.",
   result: "배포 일시를 적으면 결과를 정리합니다.",
-  business: "판매 데이터가 아직 연결되지 않았습니다.",
+  business:
+    "배포 일시를 적고 설정에서 공시 실적·점유율을 연결하면 배포 분기의 공개 지표를 붙입니다.",
   retro: "아쉬운 점과 다음에 다르게 할 것을 적어 주세요.",
 };
 export const missingHint = (key: CaseLine["key"]) => missingText[key];

@@ -109,9 +109,79 @@ test("case study fields save on the initiative and show as eight lines", async (
   await expect(lines).toHaveCount(8);
   await expect(lines.nth(3)).toContainText("버튼 위치 이동");
   await expect(lines.nth(5)).toContainText("실제 발생 1");
-  await expect(lines.nth(6)).toContainText(
-    "판매 데이터가 아직 연결되지 않았습니다",
-  );
+  await expect(lines.nth(6)).toContainText("공시 실적·점유율을 연결하면");
+
+  // Public data (synthetic values) fills the business line as market context.
+  await page.evaluate(() => {
+    const ids =
+      "00000000-0000-4000-8000-000000000010:00000000-0000-4000-8000-000000000001";
+    const head = {
+      schemaVersion: 1,
+      ownerId: "00000000-0000-4000-8000-000000000010",
+      workspaceId: "00000000-0000-4000-8000-000000000001",
+      revision: 1,
+    };
+    const at = "2026-11-21T00:00:00.000Z";
+    localStorage.setItem(
+      `pmzip:public-fin:v1:${ids}`,
+      JSON.stringify({
+        ...head,
+        snapshots: [
+          {
+            id: "00000000-0000-4000-8000-000000000901",
+            importedAt: at,
+            contentHash: "a".repeat(64),
+            file: {
+              format: "pmzip.public-financials",
+              formatVersion: 1,
+              source: "dart-opendart-fnlttSinglAcnt",
+              companies: [{ corpCode: "00000001", corpName: "삼성전자" }],
+              generatedAt: at,
+              generator: { name: "synthetic", version: "1" },
+              unit: "KRW",
+              notes: [],
+              rows: [
+                {
+                  corpCode: "00000001",
+                  year: 2026,
+                  quarter: 3,
+                  fsDiv: "CFS",
+                  account: "revenue",
+                  accountName: "매출액",
+                  amount: 55e12,
+                  basis: "reported",
+                  reportCode: "11014",
+                  rceptNo: "20260000000001",
+                  currency: "KRW",
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      `pmzip:market-share:v1:${ids}`,
+      JSON.stringify({
+        ...head,
+        points: [
+          ["2026-10", 61],
+          ["2026-11", 62],
+        ].map(([month, share]) => ({
+          country: "KR",
+          month,
+          vendor: "Samsung",
+          share,
+          importedAt: at,
+          source: "csv",
+        })),
+      }),
+    );
+    window.dispatchEvent(new Event("pmzip:view"));
+  });
+  await expect(lines.nth(6)).toContainText("2026-Q4 매출: 공시 전");
+  await expect(lines.nth(6)).toContainText("KR 62.0% (전월 대비 +1.0%p)");
+  await expect(lines.nth(6)).toContainText("효과로 단정하지 않음");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

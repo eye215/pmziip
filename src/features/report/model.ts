@@ -77,7 +77,12 @@ export type Report = z.infer<typeof reportSchema>;
 export type ReportStore = z.infer<typeof reportStoreSchema>;
 
 /** Observed GA result for a released initiative (from release-compare). */
-export type Observed = { line: string; improved: boolean | null };
+export type Observed = {
+  line: string;
+  improved: boolean | null;
+  /** Public market context (DART / StatCounter); never the effect. */
+  business?: string;
+};
 
 const goStatuses = ["approved", "planned", "in_progress", "released"];
 
@@ -113,7 +118,12 @@ export function buildReport(
         title: w.title,
         project: projectName(w),
         kind: "released" as const,
-        lines: caseStudy(w, state, observed.get(w.id)?.line ?? ""),
+        lines: caseStudy(
+          w,
+          state,
+          observed.get(w.id)?.line ?? "",
+          observed.get(w.id)?.business ?? "",
+        ),
       })),
     ...[...declined]
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
