@@ -57,7 +57,8 @@ export function WorkspaceApp() {
     view = new URLSearchParams(search);
   const [editor, setEditor] = useState<Editor | null>(null),
     [notice, setNotice] = useState(""),
-    [searchOpen, setSearchOpen] = useState(false);
+    [searchOpen, setSearchOpen] = useState(false),
+    [intakeOpen, setIntakeOpen] = useState<boolean | null>(null);
   const tab = view.get("tab") || "projects",
     scope = view.get("scope") || "all",
     month = view.get("month") || "2026-11",
@@ -184,6 +185,11 @@ export function WorkspaceApp() {
       data: ["설정", "연결 정보는 이 브라우저에만"],
     } as Record<string, [string, string]>
   )[tab] ?? ["PM.zip", ""];
+  // Quick capture starts open only while nothing is collected yet; the choice
+  // is fixed once so registering the first source does not close it.
+  if (state && intakeOpen === null)
+    setIntakeOpen(!state.sources.some((x) => x.status !== "archived"));
+  const showIntake = intakeOpen ?? false;
   const freshCount =
     state?.sources.filter((s) => s.status === "inbox").length ?? 0;
 
@@ -204,6 +210,32 @@ export function WorkspaceApp() {
             <h1>{pageTitle}</h1>
             <p className="page-sub">{pageSub}</p>
           </div>
+          {state && tab === "inbox" && (
+            <button
+              type="button"
+              className="quick-button"
+              aria-expanded={showIntake}
+              aria-controls="quick-intake"
+              onClick={() => setIntakeOpen(!showIntake)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+                focusable="false"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <path
+                  d={showIntake ? "M6 6l12 12M18 6 6 18" : "M12 5v14M5 12h14"}
+                />
+              </svg>
+              빠른 수집
+            </button>
+          )}
           {state && (tab === "inbox" || tab === "work") && (
             <button
               type="button"
@@ -570,7 +602,11 @@ export function WorkspaceApp() {
                 </div>
               </>
             )}
-            {tab === "inbox" && <RequirementIntake state={state} />}
+            {tab === "inbox" && showIntake && (
+              <div id="quick-intake">
+                <RequirementIntake state={state} />
+              </div>
+            )}
             {tab === "inbox" && (
               <section className="panel">
                 <div className="section-heading">
@@ -583,7 +619,7 @@ export function WorkspaceApp() {
                   원문은 워크스페이스에서 한 번만 보관합니다. 현재 조회 월의
                   수집 기록입니다. 미분류 원문은 전체 범위에서 확인해 주세요.
                 </p>
-                <label className="check">
+                <label className="check chip-toggle">
                   <input
                     type="checkbox"
                     checked={view.get("unclassified") === "1"}
@@ -605,9 +641,27 @@ export function WorkspaceApp() {
                     className="record-row"
                     aria-label={`${source.title} 원문`}
                   >
-                    <span className="badge">{statusNames[source.status]}</span>
+                    <div className="tag-row">
+                      <span className={`tag tag-${source.status}`}>
+                        {statusNames[source.status]}
+                      </span>
+                      <span className="tag">
+                        {sourceTypeLabel[source.sourceType] ??
+                          source.sourceType}
+                      </span>
+                      <span className="tag-time">
+                        {projectMonth(source.collectedAt, "Asia/Seoul") ===
+                        month
+                          ? new Intl.DateTimeFormat("ko-KR", {
+                              timeZone: "Asia/Seoul",
+                              month: "numeric",
+                              day: "numeric",
+                            }).format(new Date(source.collectedAt))
+                          : source.collectedAt.slice(0, 10)}
+                      </span>
+                    </div>
                     <h3>{source.title}</h3>
-                    <p>{source.rawText.slice(0, 160)}</p>
+                    <p className="quote">{source.rawText.slice(0, 160)}</p>
                     <SourceDetails source={source} state={state} />
                     {source.status !== "archived" && (
                       <SourceSplitReview state={state} sourceId={source.id} />
@@ -962,6 +1016,13 @@ export function WorkspaceApp() {
   );
 }
 
+const sourceTypeLabel: Record<string, string> = {
+  manual: "직접",
+  mail: "메일",
+  slack: "Slack",
+  teams: "Teams",
+  other: "기타",
+};
 const navPaths: Record<string, string> = {
   projects: "M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z",
   inbox:
