@@ -6,7 +6,13 @@ import { coachSourceKey, coachSourceSchema } from "../coach-data/store";
 import { finSourceKey, finSourceSchema } from "../public-financials/store";
 import { marketSourceKey, marketSourceSchema } from "../market-share/store";
 
-type Row = { name: string; state: "ok" | "warn" | "off"; text: string };
+type Row = {
+  name: string;
+  state: "ok" | "warn" | "off" | "info";
+  text: string;
+  href: string;
+  icon: string;
+};
 type Src = { lastSyncAt: string | null; lastOk: boolean | null } | null;
 
 function read<T>(key: string, parse: (v: unknown) => T | null): T | null {
@@ -25,12 +31,13 @@ const when = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
-function row(name: string, src: Src): Row {
-  if (!src) return { name, state: "off", text: "연결 안 됨" };
+function row(name: string, src: Src, href: string, icon: string): Row {
+  const base = { name, href, icon };
+  if (!src) return { ...base, state: "off", text: "연결 안 됨" };
   if (src.lastOk === false)
-    return { name, state: "warn", text: "마지막 동기화 실패 · 아래에서 확인" };
+    return { ...base, state: "warn", text: "마지막 동기화 실패 · 눌러서 확인" };
   return {
-    name,
+    ...base,
     state: "ok",
     text: src.lastSyncAt ? `연결됨 · ${when(src.lastSyncAt)}` : "연결됨",
   };
@@ -48,12 +55,35 @@ function readRows(): Row[] {
     row(
       "Galaxy Coach GA",
       read(coachSourceKey(session), safe<Src>(coachSourceSchema)),
+      "#set-coach",
+      "GA",
     ),
-    row("공시 실적", read(finSourceKey(session), safe<Src>(finSourceSchema))),
+    row(
+      "공시 실적",
+      read(finSourceKey(session), safe<Src>(finSourceSchema)),
+      "#set-fin",
+      "공시",
+    ),
     row(
       "국가별 점유율",
       read(marketSourceKey(session), safe<Src>(marketSourceSchema)),
+      "#set-market",
+      "점유",
     ),
+    {
+      name: "다른 기기에서 보기",
+      state: "info",
+      text: "시트 연결만 링크로 옮깁니다",
+      href: "#set-device",
+      icon: "링크",
+    },
+    {
+      name: "기록 백업",
+      state: "info",
+      text: "내보내기·가져오기",
+      href: "#set-backup",
+      icon: "백업",
+    },
   ];
 }
 
@@ -73,18 +103,35 @@ export function ConnectionStatus() {
   return (
     <section className="panel conn-status" aria-labelledby="conn-status-h">
       <h2 id="conn-status-h">연결 상태</h2>
-      <ul>
+      <ul className="set-rows">
         {rows.map((r) => (
           <li key={r.name}>
-            <span className={`conn-dot conn-${r.state}`} aria-hidden="true" />
-            <strong>{r.name}</strong>
-            <span className="subtle">{r.text}</span>
+            <a href={r.href} className={`set-row set-${r.state}`}>
+              <span className="set-icon" aria-hidden="true">
+                {r.icon}
+              </span>
+              <span className="set-text">
+                <strong>{r.name}</strong>
+                <span className="set-state">
+                  {r.state !== "info" && (
+                    <span
+                      className={`conn-dot conn-${r.state}`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {r.text}
+                </span>
+              </span>
+              <span className="set-go" aria-hidden="true">
+                ›
+              </span>
+            </a>
           </li>
         ))}
       </ul>
       <p className="subtle">
-        연결 정보는 이 브라우저에만 저장됩니다. 다른 기기는 아래 ‘다른 기기에서
-        보기’ 링크로 연결합니다.
+        연결 정보는 이 브라우저에만 저장됩니다. 다른 기기는 ‘다른 기기에서 보기’
+        링크로 연결합니다.
       </p>
     </section>
   );

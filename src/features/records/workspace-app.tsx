@@ -974,18 +974,32 @@ export function WorkspaceApp() {
             )}
             <DeviceLinkHandler projects={state.workspace.projects} />
             {tab === "data" && <ConnectionStatus />}
-            {tab === "data" && <DeviceLinkPanel />}
             {tab === "data" && (
-              <CoachDataPanel projects={state.workspace.projects} />
+              <div id="set-device" className="set-anchor">
+                <DeviceLinkPanel />
+              </div>
             )}
-            {tab === "data" && <PublicFinancialsPanel />}
+            {tab === "data" && (
+              <div id="set-coach" className="set-anchor">
+                <CoachDataPanel projects={state.workspace.projects} />
+              </div>
+            )}
+            {tab === "data" && (
+              <div id="set-fin" className="set-anchor">
+                <PublicFinancialsPanel />
+              </div>
+            )}
             {tab === "perf" && <ReportPanel state={state} />}
             {tab === "perf" && (
               <PerformanceView projects={state.workspace.projects} />
             )}
-            {tab === "data" && <MarketSharePanel />}
             {tab === "data" && (
-              <section className="panel">
+              <div id="set-market" className="set-anchor">
+                <MarketSharePanel />
+              </div>
+            )}
+            {tab === "data" && (
+              <section className="panel" id="set-backup">
                 <h2>기록 백업</h2>
                 <p>
                   현재 브라우저 기록 전체를 JSON으로 백업합니다. 새 버전 백업의
