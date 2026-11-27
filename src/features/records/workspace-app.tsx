@@ -10,6 +10,7 @@ import { DeviceLinkHandler, DeviceLinkPanel } from "../coach-data/device-link";
 import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
 import { SegmentFinPanel } from "../segment-fin/panel";
+import { RecordsSync, SyncPanel } from "../sync/react";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
@@ -387,6 +388,7 @@ export function WorkspaceApp() {
                 />
               </div>
             )}
+            <RecordsSync />
             {notice && (
               <p className="notice" role="status">
                 {notice}
@@ -975,6 +977,11 @@ export function WorkspaceApp() {
             )}
             <DeviceLinkHandler projects={state.workspace.projects} />
             {tab === "data" && <ConnectionStatus />}
+            {tab === "data" && (
+              <div id="set-sync" className="set-anchor">
+                <SyncPanel />
+              </div>
+            )}
             {tab === "data" && (
               <div id="set-device" className="set-anchor">
                 <DeviceLinkPanel />

@@ -5,13 +5,18 @@ import { session } from "../records/browser-store";
 import { loadCoachSource, saveCoachSource } from "./store";
 import { finSourceKey, finSourceSchema } from "../public-financials/store";
 import { marketSourceKey, marketSourceSchema } from "../market-share/store";
+import {
+  loadSyncConfig,
+  saveSyncConfig,
+  syncConfigSchema,
+} from "../sync/client";
 
 /**
  * "Open on another device": the sheet IDs travel in the URL fragment
  * (#connect=…), which browsers never send to the server. Opening the link
  * connects the three sheet sources in that browser, then removes the fragment.
- * Nothing else (records, imported data) is copied — each device syncs from
- * the same sheet.
+ * Records are not in the link: when records sync is on, its web app address
+ * and token travel too and the device then pulls the records from the sheet.
  */
 type ProjectOption = { id: string; kind: string; archivedAt: string | null };
 
@@ -46,6 +51,11 @@ function currentLink(): string | null {
   }
   if (fin.success) params.set("dart", fin.data.sheetId);
   if (market.success) params.set("share", market.data.sheetId);
+  const sync = loadSyncConfig(window.localStorage, session);
+  if (sync) {
+    params.set("sync", sync.url);
+    params.set("st", sync.token);
+  }
   if (![...params.keys()].length) return null;
   const url = new URL(window.location.href);
   url.search = "?tab=data";
@@ -110,6 +120,22 @@ export function applyDeviceLink(projects: ProjectOption[]): string | null {
       );
       done.push("점유율");
     }
+    if (p.get("sync") && p.get("st")) {
+      saveSyncConfig(
+        window.localStorage,
+        session,
+        syncConfigSchema.parse({
+          url: p.get("sync"),
+          token: p.get("st"),
+          lastRevision: null,
+          lastHash: null,
+          lastSyncAt: null,
+          lastOk: null,
+          lastResult: null,
+        }),
+      );
+      done.push("기록 동기화");
+    }
     if (!done.length) return "연결 링크에 사용할 수 있는 시트가 없습니다.";
     return `이 기기를 시트에 연결했습니다 (${done.join("·")}). 아래에서 자동으로 동기화한 뒤 성과 탭에서 볼 수 있습니다.`;
   } catch {
@@ -162,9 +188,19 @@ export function DeviceLinkHandler({ projects }: { projects: ProjectOption[] }) {
 /** Data tab: copy/share the link for another device. */
 export function DeviceLinkPanel() {
   const ids = useId();
-  const [link] = useState(() =>
+  const [link, setLink] = useState(() =>
     typeof window === "undefined" ? null : currentLink(),
   );
+  // Sheets or records sync connected later: rebuild the link.
+  useEffect(() => {
+    const again = () => setLink(currentLink());
+    window.addEventListener("pmzip:synced", again);
+    window.addEventListener("pmzip:view", again);
+    return () => {
+      window.removeEventListener("pmzip:synced", again);
+      window.removeEventListener("pmzip:view", again);
+    };
+  }, []);
   const [copied, setCopied] = useState("");
   if (!link) return null;
   const canShare =

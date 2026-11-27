@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { runtime, session } from "../records/browser-store";
 import {
   appendSegment,
@@ -42,6 +42,11 @@ export function SegmentFinPanel() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const again = () => setStore(read());
+    window.addEventListener("pmzip:synced", again);
+    return () => window.removeEventListener("pmzip:synced", again);
+  }, []);
   const rows = store.loaded ? currentSegments(store.loaded.state) : [];
   const exists = rows.some(
     (r) => segmentKey(r) === segmentKey({ year, quarter, segment }),
