@@ -1,0 +1,41 @@
+[
+ {
+  "_id": {
+   "$oid": "00000000000000000000012d"
+  },
+  "user": {
+   "$oid": "000000000000000000000001"
+  },
+  "createdAt": {
+   "$date": "2026-09-02T01:00:00Z"
+  },
+  "status": "completed",
+  "state": {
+   "sales_info": {
+    "session": "s-1",
+    "step": "report",
+    "report": {
+     "id": 1
+    }
+   }
+  }
+ },
+ {
+  "_id": {
+   "$oid": "00000000000000000000012e"
+  },
+  "user": {
+   "$oid": "000000000000000000000002"
+  },
+  "createdAt": {
+   "$date": "2026-09-03T01:00:00Z"
+  },
+  "status": "progress",
+  "state": {
+   "sales_info": {
+    "session": "s-2",
+    "step": "talk"
+   }
+  }
+ }
+]
