@@ -17,18 +17,19 @@ import {
   type Report,
   type ReportContent,
 } from "./model";
+import { businessContext } from "./business";
+import { readPublicContext } from "./business-read";
 import "./report.css";
 
 export function observeFor(state: RecordsState) {
+  const pub = readPublicContext();
   return (w: Initiative): Observed => {
     const project = state.workspace.projects.find((p) => p.id === w.projectId);
-    if (!w.releasedAt || project?.kind !== "coach")
-      return { line: "", improved: null };
-    const windows = readWindows(
-      project.id,
-      dayIn(w.releasedAt, project.timezone),
-    );
-    for (const win of windows) {
+    if (!w.releasedAt || !project) return { line: "", improved: null };
+    const day = dayIn(w.releasedAt, project.timezone);
+    const business = businessContext(day, pub);
+    if (project.kind !== "coach") return { line: "", improved: null, business };
+    for (const win of readWindows(project.id, day)) {
       const rows = compareRows(win);
       if (!rows) continue;
       const c = rows.find((r) => r.key === "countCompletionRate")!.change;
@@ -36,9 +37,10 @@ export function observeFor(state: RecordsState) {
       return {
         line: releaseSummary([win]),
         improved: points === null ? null : points > 0,
+        business,
       };
     }
-    return { line: "", improved: null };
+    return { line: "", improved: null, business };
   };
 }
 

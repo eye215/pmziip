@@ -1,5 +1,7 @@
 "use client";
 
+import { businessContext } from "../report/business";
+import { readPublicContext } from "../report/business-read";
 import { useEffect, useId, useMemo, useState } from "react";
 import type { Initiative, RecordsState } from "./model";
 import {
@@ -106,7 +108,13 @@ export function CaseStudyView({
     [releaseDay, isCoach, projectId, version],
   );
   const summary = releaseSummary(windows);
-  const lines = caseStudy(work, state, summary);
+  const business = useMemo(
+    () => (releaseDay ? businessContext(releaseDay, readPublicContext()) : ""),
+    // version: re-read on storage / view events
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [releaseDay, version],
+  );
+  const lines = caseStudy(work, state, summary, business);
   const done = lines.filter((l) => !l.missing).length;
   const flow = flowStages(work, state, !!summary);
   const linkedCount = state.links.filter(
