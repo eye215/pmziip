@@ -11,6 +11,8 @@ import { PublicFinancialsPanel } from "../public-financials/panel";
 import { MarketSharePanel } from "../market-share/panel";
 import { SegmentFinPanel } from "../segment-fin/panel";
 import { RecordsSync, SyncPanel } from "../sync/react";
+import { CoachDbPanel } from "../coach-db/panel";
+import { CoachDbView } from "../coach-db/view";
 import { PerformanceView } from "../performance/view";
 import { RequirementIntake } from "../intake/panel";
 import { CaseStudyView } from "./case-study-view";
@@ -1054,6 +1056,11 @@ export function WorkspaceApp() {
               </div>
             )}
             {tab === "data" && (
+              <div id="set-coachdb" className="set-anchor">
+                <CoachDbPanel />
+              </div>
+            )}
+            {tab === "data" && (
               <div id="set-fin" className="set-anchor">
                 <PublicFinancialsPanel />
               </div>
@@ -1064,6 +1071,7 @@ export function WorkspaceApp() {
               </div>
             )}
             {tab === "perf" && <ReportPanel state={state} />}
+            {tab === "perf" && <CoachDbView />}
             {tab === "perf" && (
               <PerformanceView projects={state.workspace.projects} />
             )}

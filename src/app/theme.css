@@ -1589,3 +1589,8 @@ p.clamp-2 {
   margin: 2px 0 6px;
   overflow-wrap: anywhere;
 }
+.seg-table td.wrap {
+  white-space: normal;
+  min-width: 16em;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,18 @@
+[
+ {
+  "_id": {
+   "$oid": "000000000000000000000001"
+  },
+  "personalData": {
+   "countryCode": "KR"
+  }
+ },
+ {
+  "_id": {
+   "$oid": "000000000000000000000002"
+  },
+  "personalData": {
+   "countryCode": "US"
+  }
+ }
+]
