@@ -139,6 +139,68 @@ test("empty home leads to quick capture, already open", async ({ page }) => {
   ).toHaveAttribute("aria-expanded", "true");
 });
 
+test("exclusion rules: hide matching mail, never propose it, archive registered ones", async ({
+  page,
+}) => {
+  const intake = await openIntake(page);
+  await intake.getByRole("button", { name: "Gmail·캘린더 파일" }).click();
+  await intake
+    .getByLabel("Gmail·캘린더 내보내기 파일")
+    .setInputFiles("tests/fixtures/inbox-export.synthetic.json");
+  const weekly = intake.getByRole("article", {
+    name: "[합성] 주간 공유 수집 후보",
+  });
+  // "이런 메일 제외" opens a form prefilled with the sender domain.
+  await weekly.getByRole("button", { name: "이런 메일 제외" }).click();
+  await expect(weekly.getByLabel("포함된 글자")).toHaveValue("example.invalid");
+  await weekly.getByLabel("어디에서 찾을까요").selectOption("title");
+  await weekly.getByLabel("포함된 글자").fill("주간 공유");
+  await weekly.getByRole("button", { name: "규칙 추가" }).click();
+  await expect(intake.locator(".intake-review > p[role=status]")).toContainText(
+    "제외 규칙 1건",
+  );
+  await expect(weekly).toHaveCount(0);
+  await intake.getByRole("button", { name: "숨긴 1건 보기" }).click();
+  await expect(weekly).toContainText("제외 규칙(메일만 · 제목: 주간 공유)");
+  await intake.getByRole("button", { name: "숨긴 1건 숨기기" }).click();
+  await intake
+    .getByRole("button", { name: "수집함에 등록 (원문 2건)" })
+    .click();
+  await expect(intake.getByRole("status").last()).toContainText(
+    "원문 2건을 등록했습니다.",
+  );
+
+  // A domain rule then matches an already registered source: archive it.
+  await intake.getByText(/^수집 규칙 1개/).click();
+  const manager = intake.locator(".intake-rules");
+  await manager.getByLabel("어디에서 찾을까요").selectOption("domain");
+  await manager.getByLabel("포함된 글자").fill("example.invalid");
+  await manager.getByRole("button", { name: "규칙 추가" }).click();
+  await expect(manager.getByRole("listitem")).toHaveCount(2);
+  page.once("dialog", (d) => d.accept());
+  await page
+    .getByRole("button", { name: "제외 규칙에 맞는 원문 1건 보관" })
+    .click();
+  await expect(page.getByText("원문 1건을 보관했습니다.")).toBeVisible();
+  const state = await stored(page);
+  expect(
+    state.sources.map((x: { title: string; status: string }) => [
+      x.title,
+      x.status,
+    ]),
+  ).toEqual([
+    ["[합성] 리포트 개선 요청", "archived"],
+    ["[합성] 고객사 정기 회의", "inbox"],
+  ]);
+  // Rules can be removed again.
+  await manager
+    .getByRole("button", {
+      name: "보낸 곳(도메인): example.invalid 규칙 지우기",
+    })
+    .click();
+  await expect(manager.getByRole("listitem")).toHaveCount(1);
+});
+
 test("Teams paste: name/time headers are dropped, original kept", async ({
   page,
 }) => {
@@ -259,7 +321,7 @@ test("automated notifications are hidden, unselected and propose nothing", async
     name: '"[합성] 개편안.docx"에 대한 공유 요청 수집 후보',
   });
   await expect(notice).toHaveCount(0); // hidden by default
-  await intake.getByRole("button", { name: "자동 알림 1건 보기" }).click();
+  await intake.getByRole("button", { name: "숨긴 1건 보기" }).click();
   await expect(notice).toContainText("자동 알림(문서 공유·액세스 알림)");
   await expect(notice.getByRole("checkbox").first()).not.toBeChecked();
   await expect(notice.getByLabel("후보 제목")).toHaveCount(0);

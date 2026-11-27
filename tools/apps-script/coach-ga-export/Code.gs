@@ -8,7 +8,7 @@
  * tests/unit/coach-export.test.ts checks these constants.
  */
 var DEFINITION_VERSION = 'coach-ga4-1.2';
-var GENERATOR = { name: 'coach-ga-export.gs', version: '1.0.0' };
+var GENERATOR = { name: 'coach-ga-export.gs', version: '1.1.0' };
 var MAIN_EVENT = 'screen_view';
 var MAIN_SCREEN_DIMENSION = 'unifiedScreenName';
 var MAIN_SCREEN = 'GALAXY_COACH_SCREEN';
@@ -120,6 +120,11 @@ function writeSummary_(sheet, data) {
 }
 
 /** Last 7 full days, month-to-date (until yesterday), previous two full months. */
+/**
+ * Last 7 days, this month so far, and every full month from GA_HISTORY_FROM
+ * (Script Properties, YYYY-MM; default: January of this year) up to last
+ * month. At most 36 months.
+ */
 function defaultPeriods_() {
   var tz = Session.getScriptTimeZone();
   var fmt = function (d) { return Utilities.formatDate(d, tz, 'yyyy-MM-dd'); };
@@ -131,13 +136,21 @@ function defaultPeriods_() {
   var periods = [{ startDate: fmt(weekStart), endDate: fmt(yesterday) }];
   var monthStart = y + '-' + pad_(m) + '-01';
   if (monthStart <= fmt(yesterday)) periods.push({ startDate: monthStart, endDate: fmt(yesterday) });
-  for (var i = 1; i <= 2; i++) {
-    var mm = m - i, yy = y;
-    while (mm < 1) { mm += 12; yy -= 1; }
+  var from = String(PropertiesService.getScriptProperties().getProperty('GA_HISTORY_FROM') || '');
+  var fy = y, fm = 1;
+  var mt = from.match(/^(\d{4})-(\d{2})$/);
+  if (mt) { fy = Number(mt[1]); fm = Number(mt[2]); }
+  // Always at least the last 2 full months (previous behaviour).
+  var minY = y, minM = m - 2;
+  while (minM < 1) { minM += 12; minY -= 1; }
+  if (fy * 12 + fm > minY * 12 + minM) { fy = minY; fm = minM; }
+  var months = [];
+  for (var yy = y, mm = m - 1; yy * 12 + mm >= fy * 12 + fm && months.length < 36; mm--) {
+    if (mm < 1) { mm += 12; yy -= 1; if (yy * 12 + mm < fy * 12 + fm) break; }
     var last = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
-    periods.push({ startDate: yy + '-' + pad_(mm) + '-01', endDate: yy + '-' + pad_(mm) + '-' + pad_(last) });
+    months.push({ startDate: yy + '-' + pad_(mm) + '-01', endDate: yy + '-' + pad_(mm) + '-' + pad_(last) });
   }
-  return periods;
+  return periods.concat(months);
 }
 function pad_(n) { return (n < 10 ? '0' : '') + n; }
 

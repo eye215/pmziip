@@ -2,6 +2,9 @@
 import { useId, useState } from "react";
 import { z } from "zod";
 import { autoNoticeReason } from "../../lib/connectors/auto-notice";
+import { excludedBy } from "../../lib/connectors/exclude-rules";
+import { RuleForm, RuleManager } from "./rule-form";
+import { useRules } from "./use-rules";
 import {
   EXTRACT_VERSION,
   extractCandidates,
@@ -49,6 +52,10 @@ type Message = {
   duplicate: boolean;
   /** Automated notification (reason), hidden and not proposed by default. */
   auto: string | null;
+  /** Sender domain (mail), used by exclusion rules. */
+  domain: string | null;
+  /** Collected channel; null for pasted text (never filtered). */
+  channel: "gmail" | "slack" | "calendar" | null;
   candidates: Candidate[];
 };
 type Pick = {
@@ -115,6 +122,15 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAuto, setShowAuto] = useState(false);
+  const [ruleFor, setRuleFor] = useState<string | null>(null);
+  const rules = useRules();
+  const excluded = (m: Message) =>
+    excludedBy(rules, {
+      title: m.title,
+      body: m.body,
+      domain: m.domain,
+      channel: m.channel,
+    });
 
   const isDuplicate = (body: string, reference: string) =>
     state.sources.some(
@@ -127,7 +143,11 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         list.map((m) => [
           m.key,
           {
-            source: !m.duplicate && !m.auto && m.candidates.length > 0,
+            source:
+              !m.duplicate &&
+              !m.auto &&
+              !excluded(m) &&
+              m.candidates.length > 0,
             candidates: Object.fromEntries(
               m.candidates.map((c) => [c.key, { on: true, title: c.title }]),
             ),
@@ -159,6 +179,8 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
         channelLabel: ch.label,
         duplicate: isDuplicate(body, ""),
         auto: null,
+        domain: null,
+        channel: null,
         candidates,
       },
     ]);
@@ -185,6 +207,8 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
               ? "Slack"
               : "캘린더",
         duplicate: isDuplicate(it.body || it.title, it.link),
+        domain: it.fromDomain ? it.fromDomain.replace(/^@/, "") : null,
+        channel: it.channel,
         ...(() => {
           const auto = autoNoticeReason(it);
           // Notifications keep their original but propose no requirement.
@@ -250,7 +274,19 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
   }
 
   const autoCount = (messages ?? []).filter((m) => m.auto).length;
-  const chosen = (messages ?? []).filter((m) => picks[m.key]?.source);
+  const excludedCount = (messages ?? []).filter(
+    (m) => !m.auto && excluded(m),
+  ).length;
+  const hiddenCount = autoCount + excludedCount;
+  /** A new rule unselects what it now hides (never selects anything). */
+  function ruleAdded(message: string) {
+    setNotice(message);
+    setRuleFor(null);
+  }
+  // Hidden items (automated, excluded) are never registered unless shown.
+  const chosen = (messages ?? []).filter(
+    (m) => picks[m.key]?.source && (showAuto || (!m.auto && !excluded(m))),
+  );
   const workCount = makeWork
     ? chosen.reduce(
         (n, m) =>
@@ -489,6 +525,7 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
           {notice}
         </p>
       )}
+      <RuleManager onDone={ruleAdded} />
       {messages && (
         <div className="intake-review">
           <p role="status">
@@ -498,8 +535,9 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
               ? ` · 이미 수집함에 있음 ${messages.filter((m) => m.duplicate).length}건`
               : ""}
             {autoCount ? ` · 자동 알림 ${autoCount}건` : ""}
+            {excludedCount ? ` · 제외 규칙 ${excludedCount}건` : ""}
           </p>
-          {autoCount ? (
+          {hiddenCount ? (
             <div className="actions">
               <button
                 type="button"
@@ -507,19 +545,20 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                 onClick={() => setShowAuto(!showAuto)}
               >
                 {showAuto
-                  ? `자동 알림 ${autoCount}건 숨기기`
-                  : `자동 알림 ${autoCount}건 보기`}
+                  ? `숨긴 ${hiddenCount}건 숨기기`
+                  : `숨긴 ${hiddenCount}건 보기`}
               </button>
               <span className="subtle">
-                문서 공유·댓글·초대 같은 자동 알림은 후보를 만들지 않고 기본으로
+                자동 알림과 제외 규칙에 맞는 항목은 후보를 만들지 않고 기본으로
                 선택하지 않습니다.
               </span>
             </div>
           ) : null}
           {messages
-            .filter((m) => showAuto || !m.auto)
+            .filter((m) => showAuto || (!m.auto && !excluded(m)))
             .map((m) => {
               const pick = picks[m.key];
+              const rule = m.auto ? null : excluded(m);
               return (
                 <article
                   key={m.key}
@@ -546,10 +585,11 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                         {m.requesterRole ? ` · ${m.requesterRole}` : ""}
                         {m.duplicate ? " · 이미 등록됨" : ""}
                         {m.auto ? ` · 자동 알림(${m.auto})` : ""}
+                        {rule ? ` · 제외 규칙(${rule.label})` : ""}
                       </span>
                     </span>
                   </label>
-                  {m.candidates.length ? (
+                  {m.candidates.length && !rule ? (
                     <ul className="intake-candidates">
                       {m.candidates.map((c) => {
                         const cp = pick?.candidates[c.key];
@@ -611,13 +651,36 @@ export function RequirementIntake({ state }: { state: RecordsState }) {
                     <p className="subtle">
                       {m.auto
                         ? "자동 알림이라 요구사항 후보를 만들지 않았습니다. 필요하면 원문만 등록하세요."
-                        : "요구사항 후보를 찾지 못했습니다. 필요하면 원문만 등록하세요."}
+                        : rule
+                          ? "제외 규칙에 맞아 요구사항 후보를 만들지 않았습니다. 필요하면 원문만 등록하세요."
+                          : "요구사항 후보를 찾지 못했습니다. 필요하면 원문만 등록하세요."}
                     </p>
                   )}
                   <details>
                     <summary>원문 보기</summary>
                     <pre>{trim(m.body, 4000)}</pre>
                   </details>
+                  {m.channel && m.channel !== "calendar" && !rule && (
+                    <div className="actions">
+                      <button
+                        type="button"
+                        aria-expanded={ruleFor === m.key}
+                        onClick={() =>
+                          setRuleFor(ruleFor === m.key ? null : m.key)
+                        }
+                      >
+                        이런 메일 제외
+                      </button>
+                    </div>
+                  )}
+                  {ruleFor === m.key && (
+                    <RuleForm
+                      channel={m.channel === "slack" ? "slack" : "gmail"}
+                      field={m.domain ? "domain" : "title"}
+                      text={m.domain ?? m.title.slice(0, 40)}
+                      onDone={ruleAdded}
+                    />
+                  )}
                 </article>
               );
             })}

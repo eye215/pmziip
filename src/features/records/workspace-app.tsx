@@ -28,8 +28,20 @@ import {
   saveRecords,
   retryRecords,
   rawBackup,
+  runtime,
 } from "./browser-store";
-import { queryInitiatives, type Command, type WorkQuery } from "./model";
+import {
+  applyCommand,
+  queryInitiatives,
+  type Command,
+  type WorkQuery,
+} from "./model";
+import { useRules } from "../intake/use-rules";
+import {
+  channelOfSource,
+  domainFromRole,
+  excludedBy,
+} from "../../lib/connectors/exclude-rules";
 import {
   RecordEditor,
   SourceDetails,
@@ -108,6 +120,48 @@ export function WorkspaceApp() {
       setNotice("기록을 저장했습니다.");
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "저장하지 못했습니다.");
+    }
+  }
+  const rules = useRules();
+  const ruleMatched =
+    state?.sources.filter(
+      (x) =>
+        x.status !== "archived" &&
+        !!excludedBy(rules, {
+          title: x.title,
+          body: x.rawText,
+          domain: domainFromRole(x.requesterRole),
+          channel: channelOfSource(x.sourceType),
+        }),
+    ) ?? [];
+  async function archiveRuleMatched() {
+    if (!state || !ruleMatched.length) return;
+    if (
+      !window.confirm(
+        `제외 규칙에 맞는 원문 ${ruleMatched.length}건을 보관할까요? 지우지 않으며, '보관 기록 포함'으로 다시 볼 수 있습니다.`,
+      )
+    )
+      return;
+    try {
+      const ids = new Set(ruleMatched.map((x) => x.id));
+      await saveRecords(
+        (s) =>
+          s.sources
+            .filter((x) => ids.has(x.id) && x.status !== "archived")
+            .reduce(
+              (acc, x) =>
+                applyCommand(
+                  acc,
+                  { type: "source.status", id: x.id, status: "archived" },
+                  runtime,
+                ),
+              s,
+            ),
+        state.revision,
+      );
+      setNotice(`원문 ${ids.size}건을 보관했습니다.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "보관하지 못했습니다.");
     }
   }
   const inScope = (projectId: string) =>
@@ -638,6 +692,13 @@ export function WorkspaceApp() {
                   />
                   연결되지 않은 원문만
                 </label>
+                {ruleMatched.length > 0 && (
+                  <div className="actions">
+                    <button type="button" onClick={archiveRuleMatched}>
+                      제외 규칙에 맞는 원문 {ruleMatched.length}건 보관
+                    </button>
+                  </div>
+                )}
                 {!sources.length && (
                   <p className="empty-state">
                     아직 이 조건에 맞는 원문이 없습니다. 원문을 등록하거나 조회
