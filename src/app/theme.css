@@ -1444,3 +1444,51 @@ p.clamp-2 {
   font-size: 14px;
   text-align: center;
 }
+
+/* 공개 부문 실적 입력 */
+.seg-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.seg-form .seg-source {
+  grid-column: 1 / -1;
+}
+.seg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 12px;
+}
+.seg-table th,
+.seg-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.seg-table th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.seg-table a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+@media (max-width: 560px) {
+  .seg-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .seg-form .field:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
