@@ -7,6 +7,7 @@ import { finSourceKey, finSourceSchema } from "../public-financials/store";
 import { marketSourceKey, marketSourceSchema } from "../market-share/store";
 import { currentSegments, loadSegments } from "../segment-fin/store";
 import { loadSyncConfig } from "../sync/client";
+import { loadCoachDb } from "../coach-db/store";
 
 type Row = {
   name: string;
@@ -43,6 +44,30 @@ function row(name: string, src: Src, href: string, icon: string): Row {
     state: "ok",
     text: src.lastSyncAt ? `연결됨 · ${when(src.lastSyncAt)}` : "연결됨",
   };
+}
+function coachDbRow(): Row {
+  const base = {
+    name: "Galaxy Coach DB 세션",
+    href: "#set-coachdb",
+    icon: "DB",
+  };
+  try {
+    const s = loadCoachDb(window.localStorage, session);
+    if (!s) return { ...base, state: "off", text: "가져온 적 없음" };
+    const first = s.global[0]?.year_month ?? "-";
+    const last = s.global.at(-1)?.year_month ?? "-";
+    return {
+      ...base,
+      state: "ok",
+      text: `${first} ~ ${last} · ${s.generatedAt.slice(0, 10)} 집계`,
+    };
+  } catch {
+    return {
+      ...base,
+      state: "warn",
+      text: "집계를 읽지 못함 · 눌러서 다시 가져오기",
+    };
+  }
 }
 function syncRow(): Row {
   const base = { name: "기기 간 기록 동기화", href: "#set-sync", icon: "동기" };
@@ -86,6 +111,7 @@ function readRows(): Row[] {
     };
   return [
     syncRow(),
+    coachDbRow(),
     row(
       "Galaxy Coach GA",
       read(coachSourceKey(session), safe<Src>(coachSourceSchema)),

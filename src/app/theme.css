@@ -1568,3 +1568,8 @@ p.clamp-2 {
     grid-template-columns: 1fr;
   }
 }
+.seg-table td.wrap {
+  white-space: normal;
+  min-width: 16em;
+  overflow-wrap: anywhere;
+}
