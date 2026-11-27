@@ -24,7 +24,9 @@ export function CoachDbView() {
     const again = () => setS(read());
     window.addEventListener("pmzip:view", again);
     window.addEventListener("storage", again);
+    window.addEventListener("pmzip:synced", again);
     return () => {
+      window.removeEventListener("pmzip:synced", again);
       window.removeEventListener("pmzip:view", again);
       window.removeEventListener("storage", again);
     };

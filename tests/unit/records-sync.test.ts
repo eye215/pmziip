@@ -254,5 +254,38 @@ describe("PC → sheet → phone (real Sync.gs)", () => {
     expect(() => validateBundle(foreign, session)).toThrow();
     expect(() => validateBundle({ ...b, format: "x" }, session)).toThrow();
     expect(validateBundle(b, session)).toEqual(b);
+    // Coach DB aggregates travel too and are validated; older bundles load.
+    const coach = JSON.stringify({
+      schemaVersion: 1,
+      ownerId: session.ownerId,
+      workspaceId: session.workspaceId,
+      calcVersion: "coach-db-1.0",
+      generatedAt: "2026-11-27T00:00:00.000Z",
+      inputHash: "c".repeat(64),
+      files: [],
+      config: {
+        timeZone: "UTC",
+        includeChannels: [],
+        testChannels: [],
+        includeDeleted: false,
+      },
+      global: [],
+      country: [],
+      version: [],
+      quality: [],
+    });
+    expect(
+      validateBundle({ ...b, items: { ...b.items, coachDb: coach } }, session)
+        .items.coachDb,
+    ).toBe(coach);
+    expect(() =>
+      validateBundle({ ...b, items: { ...b.items, coachDb: "{}" } }, session),
+    ).toThrow();
+    const { coachDb: _drop, rules: _drop2, ...older } = b.items;
+    void _drop;
+    void _drop2;
+    expect(
+      validateBundle({ ...b, items: older }, session).items.coachDb,
+    ).toBeNull();
   });
 });
