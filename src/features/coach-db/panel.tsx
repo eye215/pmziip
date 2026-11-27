@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { session } from "../records/browser-store";
 import { sha256 } from "../coach-data/store";
 import { parseCollection } from "../../lib/coach-db/ejson";
@@ -84,6 +84,18 @@ export function CoachDbPanel() {
       return null;
     }
   });
+
+  useEffect(() => {
+    const again = () => {
+      try {
+        setSaved(loadCoachDb(window.localStorage, session));
+      } catch {
+        // Keep what is shown.
+      }
+    };
+    window.addEventListener("pmzip:synced", again);
+    return () => window.removeEventListener("pmzip:synced", again);
+  }, []);
 
   async function run() {
     setError("");

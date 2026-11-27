@@ -210,10 +210,10 @@ export function SyncPanel() {
     <section className="panel coach-data" aria-labelledby={`${ids}-h`}>
       <h2 id={`${ids}-h`}>기기 간 기록 동기화</h2>
       <p className="subtle">
-        원문·과제·보고서·부문 실적을 내 구글 드라이브의 비공개 시트(별도 Apps
-        Script 웹 앱)에 저장해 PC와 휴대폰이 같은 기록을 봅니다. 주소와 토큰은
-        이 브라우저에만 저장됩니다. 설정 방법은 tools/apps-script/records-sync
-        안내를 따릅니다.
+        원문·과제·보고서·부문 실적·수집 규칙·Coach DB 집계를 내 구글 드라이브의
+        비공개 시트(별도 Apps Script 웹 앱)에 저장해 PC와 휴대폰이 같은 기록을
+        봅니다. 주소와 토큰은 이 브라우저에만 저장됩니다. 설정 방법은
+        tools/apps-script/records-sync 안내를 따릅니다.
       </p>
       {!cfg ? (
         <>
