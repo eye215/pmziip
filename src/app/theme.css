@@ -1568,3 +1568,24 @@ p.clamp-2 {
     grid-template-columns: 1fr;
   }
 }
+
+/* 첨부에서 찾은 후보 */
+.intake-origin {
+  display: inline-block;
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--body);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.intake-attach {
+  margin: 2px 0 6px;
+  overflow-wrap: anywhere;
+}

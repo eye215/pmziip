@@ -201,6 +201,29 @@ test("exclusion rules: hide matching mail, never propose it, archive registered 
   await expect(manager.getByRole("listitem")).toHaveCount(1);
 });
 
+test("mail attachments: text shown per file, candidates marked, kept in 원문", async ({
+  page,
+}) => {
+  const intake = await openIntake(page);
+  await intake.getByRole("button", { name: "Gmail·캘린더 파일" }).click();
+  await intake
+    .getByLabel("Gmail·캘린더 내보내기 파일")
+    .setInputFiles("tests/fixtures/inbox-export-attachments.synthetic.json");
+  const mail = intake.getByRole("article", {
+    name: "[합성] 개편안 전달 수집 후보",
+  });
+  await expect(mail).toContainText("합성 기획서.docx (");
+  await expect(mail).toContainText("합성 표.xlsx (읽지 못함: 변환 실패 500)");
+  await expect(mail.locator(".intake-origin").first()).toHaveText(
+    "첨부 합성 기획서.docx",
+  );
+  await intake.getByRole("button", { name: /수집함에 등록/ }).click();
+  await expect(intake.getByRole("status").last()).toContainText("등록했습니다");
+  const state = await stored(page);
+  expect(state.sources[0].rawText).toContain("[첨부: 합성 기획서.docx]");
+  expect(state.sources[0].rawText).not.toContain("합성 표.xlsx");
+});
+
 test("Teams paste: name/time headers are dropped, original kept", async ({
   page,
 }) => {

@@ -8,7 +8,7 @@
  *   INBOX_CALENDAR_DAYS (default 14, 0 = off).
  * - Sender is reduced to its domain. Nothing is modified in Gmail or Calendar.
  */
-var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.5.0' };
+var INBOX_GENERATOR = { name: 'Inbox.gs', version: '1.6.0' };
 /** One-line result of the last buildInboxExport_ (counts + reasons), no message content. */
 var INBOX_LAST_STATUS_ = '';
 // Separate caps so one source cannot crowd out another (PM.zip accepts ≤1000).
@@ -16,6 +16,7 @@ var INBOX_MAX_ITEMS = 300; // Gmail messages
 var INBOX_MAX_CALENDAR = 100;
 var INBOX_MAX_SLACK = 300;
 var INBOX_SHEET_MAX_BODY = 8000; // per item in the shared sheet (keeps the tab small)
+var INBOX_SHEET_ATTACH_TEXT = 4000; // per attachment in the shared sheet
 var INBOX_MAX_BODY = 20000;
 
 function inboxDomain_(from) {
@@ -48,6 +49,7 @@ var PMZIP_SETTINGS = [
   ['INBOX_DAYS', '메일 기간(일)', '30', '최근 며칠 메일을 가져올지 (1~365)'],
   ['INBOX_CALENDAR_DAYS', '캘린더 기간(일)', '14', '0이면 캘린더 수집 끔'],
   ['SLACK_CHANNELS', 'Slack 채널', '', '쉼표로 여러 개. 봇을 채널에 초대해야 합니다. 토큰은 여기 쓰지 마세요.'],
+  ['INBOX_ATTACHMENTS', '메일 첨부 글자 가져오기', 'off', 'on이면 PDF·워드·엑셀·PPT·텍스트 첨부를 글자로 바꿔 함께 가져옵니다(메일당 3개, 개당 4,000자). 이 시트는 링크 공유라 민감한 첨부가 있는 라벨은 빼세요.'],
 ];
 
 function pmzipSettingDef_(key) {
@@ -211,12 +213,19 @@ function buildInboxExport_() {
   if (!(days >= 1 && days <= 365)) days = 30;
   if (!(calDays >= 0)) calDays = 14;
   var items = [];
+  var attach = {
+    on: String(pmzipSetting_('INBOX_ATTACHMENTS') || 'off').trim().toLowerCase() === 'on',
+    converted: 0,
+    started: Date.now(),
+    files: 0,
+    skipped: 0,
+  };
   var threads = GmailApp.search(inboxQuery_(label, query, days), 0, 100);
   threads.forEach(function (thread) {
     var link = thread.getPermalink();
     thread.getMessages().forEach(function (m) {
       if (items.length >= INBOX_MAX_ITEMS) return;
-      items.push({
+      var it = {
         channel: 'gmail',
         externalId: 'gmail:' + m.getId(),
         title: String(m.getSubject() || '(제목 없음)').slice(0, 300),
@@ -224,7 +233,9 @@ function buildInboxExport_() {
         fromDomain: inboxDomain_(m.getFrom()),
         receivedAt: m.getDate().toISOString(),
         link: link,
-      });
+      };
+      if (attach.on) it.attachments = inboxAttachments_(m, attach);
+      items.push(it);
     });
   });
   if (calDays > 0) {
@@ -267,7 +278,8 @@ function buildInboxExport_() {
     }
   }
   INBOX_LAST_STATUS_ = [
-    'Gmail ' + nGmail + '건' + (nGmail >= INBOX_MAX_ITEMS ? '(상한 도달)' : '') + ' (' + (query ? '검색식' : '라벨 ' + label) + ', 최근 ' + days + '일)',
+    'Gmail ' + nGmail + '건' + (nGmail >= INBOX_MAX_ITEMS ? '(상한 도달)' : '') + ' (' + (query ? '검색식' : '라벨 ' + label) + ', 최근 ' + days + '일)' +
+      (attach.on ? ', 첨부 ' + attach.files + '개' + (attach.skipped ? '(못 읽음 ' + attach.skipped + ')' : '') : ''),
     calDays > 0 ? '캘린더 ' + nCal + '건' : '캘린더 끔',
     slackPart,
   ].join(' · ') + (notes.length ? ' — ' + notes.join(' / ') : '');
@@ -280,6 +292,107 @@ function buildInboxExport_() {
     query: { gmailLabel: query ? 'query: ' + query.slice(0, 180) : label, calendarDays: calDays > 0 ? calDays : null },
     items: items,
   };
+}
+
+/**
+ * Text of a message's attachments (setting INBOX_ATTACHMENTS = on).
+ * Plain text/CSV is read directly; PDF, Word, Excel and PowerPoint are
+ * converted to a temporary Google file in the runner's Drive, exported as
+ * text and deleted at once. Caps: 3 per message, 10MB per file, 30
+ * conversions or ~4 minutes per run; a file that cannot be read keeps its
+ * name with a note. Nothing is changed in Gmail.
+ */
+var INBOX_ATTACH_PER_MESSAGE = 3;
+var INBOX_ATTACH_TEXT = 8000;
+var INBOX_ATTACH_MAX_BYTES = 10 * 1024 * 1024;
+var INBOX_ATTACH_MAX_CONVERT = 30;
+var INBOX_ATTACH_TIME_MS = 4 * 60 * 1000;
+var INBOX_CONVERT_ = {
+  'application/pdf': ['application/vnd.google-apps.document', 'text/plain'],
+  'application/msword': ['application/vnd.google-apps.document', 'text/plain'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['application/vnd.google-apps.document', 'text/plain'],
+  'application/vnd.ms-excel': ['application/vnd.google-apps.spreadsheet', 'text/csv'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['application/vnd.google-apps.spreadsheet', 'text/csv'],
+  'application/vnd.ms-powerpoint': ['application/vnd.google-apps.presentation', 'text/plain'],
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['application/vnd.google-apps.presentation', 'text/plain'],
+};
+var INBOX_EXT_TYPE_ = {
+  pdf: 'application/pdf', doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain', csv: 'text/csv', md: 'text/plain',
+};
+
+function inboxAttachments_(m, state) {
+  if (typeof m.getAttachments !== 'function') return [];
+  var out = [];
+  var list = m.getAttachments({ includeInlineImages: false, includeAttachments: true }) || [];
+  for (var i = 0; i < list.length && out.length < INBOX_ATTACH_PER_MESSAGE; i++) {
+    var a = list[i];
+    var name = String(a.getName() || '첨부').slice(0, 200);
+    var ext = (name.match(/\.([A-Za-z0-9]+)$/) || [])[1];
+    var type = String(a.getContentType() || '').split(';')[0].toLowerCase();
+    if (!INBOX_CONVERT_[type] && !/^text\//.test(type)) type = INBOX_EXT_TYPE_[String(ext || '').toLowerCase()] || type;
+    if (!INBOX_CONVERT_[type] && !/^text\//.test(type)) continue; // images etc.
+    var entry = { name: name, mimeType: type.slice(0, 120), text: '', note: null };
+    try {
+      if (a.getSize() > INBOX_ATTACH_MAX_BYTES) {
+        entry.note = '10MB 초과라 읽지 않음';
+      } else if (/^text\//.test(type)) {
+        entry.text = a.getDataAsString('UTF-8');
+      } else if (state.converted >= INBOX_ATTACH_MAX_CONVERT || Date.now() - state.started > INBOX_ATTACH_TIME_MS) {
+        entry.note = '이번 실행의 변환 한도에 걸려 다음 실행에 읽음';
+      } else {
+        state.converted++;
+        entry.text = inboxConvert_(a, INBOX_CONVERT_[type]);
+      }
+    } catch (e) {
+      entry.note = '읽지 못함: ' + String(e && e.message || e).slice(0, 120);
+    }
+    entry.text = String(entry.text || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, INBOX_ATTACH_TEXT);
+    if (entry.note) state.skipped++;
+    else state.files++;
+    out.push(entry);
+  }
+  return out;
+}
+
+/** Upload with conversion, export as text, delete. Drive scope: drive.file. */
+function inboxConvert_(blob, how) {
+  var token = ScriptApp.getOAuthToken();
+  var boundary = 'pmzip' + Date.now();
+  var meta = JSON.stringify({ name: 'pmzip-temp-' + Date.now(), mimeType: how[0] });
+  var head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta +
+    '\r\n--' + boundary + '\r\nContent-Type: ' + blob.getContentType() + '\r\n\r\n';
+  var payload = Utilities.newBlob(head).getBytes()
+    .concat(blob.getBytes())
+    .concat(Utilities.newBlob('\r\n--' + boundary + '--').getBytes());
+  var up = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'post',
+    contentType: 'multipart/related; boundary=' + boundary,
+    payload: payload,
+    headers: { Authorization: 'Bearer ' + token },
+    muteHttpExceptions: true,
+  });
+  if (up.getResponseCode() >= 300) throw new Error('변환 실패 ' + up.getResponseCode());
+  var id = JSON.parse(up.getContentText()).id;
+  try {
+    var ex = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id + '/export?mimeType=' + encodeURIComponent(how[1]), {
+      headers: { Authorization: 'Bearer ' + token },
+      muteHttpExceptions: true,
+    });
+    if (ex.getResponseCode() >= 300) throw new Error('글자 추출 실패 ' + ex.getResponseCode());
+    return ex.getContentText('UTF-8');
+  } finally {
+    UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id, {
+      method: 'delete',
+      headers: { Authorization: 'Bearer ' + token },
+      muteHttpExceptions: true,
+    });
+  }
 }
 
 /** Called from doGet(?inbox=1) in Code.gs. */
@@ -334,6 +447,10 @@ function exportInboxToSheet() {
   data.items.forEach(function (it) {
     it.title = inboxClean_(it.title).slice(0, 300);
     it.body = inboxClean_(it.body).slice(0, INBOX_SHEET_MAX_BODY);
+    // Link-shared sheet: attachment text is masked and shorter too.
+    (it.attachments || []).forEach(function (a) {
+      a.text = inboxClean_(a.text).slice(0, INBOX_SHEET_ATTACH_TEXT);
+    });
   });
   data.generator = { name: INBOX_GENERATOR.name, version: INBOX_GENERATOR.version + '+sheet' };
   var ss = SpreadsheetApp.getActiveSpreadsheet();

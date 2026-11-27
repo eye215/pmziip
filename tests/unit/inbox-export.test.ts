@@ -458,3 +458,106 @@ describe("Gmail target: labels or search, set from the PM.zip menu", () => {
     );
   });
 });
+
+describe("Inbox.gs attachments (INBOX_ATTACHMENTS = on)", () => {
+  it("reads text directly, converts Office/PDF via Drive and deletes the temp file", () => {
+    const calls: string[] = [];
+    const att = (name: string, type: string, text: string, size = 100) => ({
+      getName: () => name,
+      getContentType: () => type,
+      getSize: () => size,
+      getDataAsString: () => text,
+      getBytes: () => [...Buffer.from(text)],
+    });
+    const ctx: Record<string, unknown> = {
+      Logger: { log: () => {} },
+      SpreadsheetApp: { getActiveSpreadsheet: () => null },
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: (k: string) =>
+            ({
+              INBOX_GMAIL_LABEL: "PMZIP",
+              INBOX_ATTACHMENTS: "on",
+              INBOX_CALENDAR_DAYS: "0",
+            })[k] ?? null,
+        }),
+      },
+      ScriptApp: { getOAuthToken: () => "tok" },
+      UrlFetchApp: {
+        fetch: (url: string, opt: { method?: string } = {}) => {
+          calls.push(`${opt.method ?? "get"} ${url.replace(/\?.*$/, "")}`);
+          if (url.includes("/upload/"))
+            return {
+              getResponseCode: () => 200,
+              getContentText: () => '{"id":"tmp1"}',
+            };
+          if (url.includes("/export"))
+            return {
+              getResponseCode: () => 200,
+              getContentText: () =>
+                "합성 기획서\r\n\r\n\r\n결과 화면 버튼 오류 수정 필요",
+            };
+          return { getResponseCode: () => 204, getContentText: () => "" };
+        },
+      },
+      Utilities: {
+        newBlob: (t: string) => ({ getBytes: () => [...Buffer.from(t)] }),
+        base64EncodeWebSafe: (s: string) =>
+          Buffer.from(s).toString("base64url"),
+      },
+      GmailApp: {
+        search: () => [
+          {
+            getPermalink: () => "https://mail.google.com/mail/u/0/#all/t1",
+            getMessages: () => [
+              {
+                getId: () => "m1",
+                getSubject: () => "합성 첨부 메일",
+                getPlainBody: () => "첨부 확인 부탁드립니다.",
+                getFrom: () => "합성 <a@example.invalid>",
+                getDate: () => new Date("2026-11-25T01:00:00Z"),
+                getAttachments: () => [
+                  att("메모.txt", "text/plain", "국가별 필터 추가 요청"),
+                  att("기획서.docx", "application/octet-stream", "PK..."),
+                  att("사진.png", "image/png", "x"),
+                  att("큰파일.pdf", "application/pdf", "x", 11 * 1024 * 1024),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      CalendarApp: {
+        getDefaultCalendar: () => ({ getId: () => "c", getEvents: () => [] }),
+      },
+    };
+    vm.createContext(ctx);
+    vm.runInContext(
+      readFileSync("tools/apps-script/coach-ga-export/Inbox.gs", "utf8"),
+      ctx,
+    );
+    const data = JSON.parse(
+      JSON.stringify(vm.runInContext("buildInboxExport_()", ctx)),
+    );
+    const file = inboxExportSchema.parse(data);
+    const a = file.items[0].attachments;
+    expect(a.map((x) => [x.name, x.note])).toEqual([
+      ["메모.txt", null],
+      ["기획서.docx", null],
+      ["큰파일.pdf", "10MB 초과라 읽지 않음"],
+    ]); // image skipped
+    expect(a[0].text).toBe("국가별 필터 추가 요청");
+    expect(a[1].text).toBe("합성 기획서\n\n결과 화면 버튼 오류 수정 필요");
+    expect(calls).toEqual([
+      "post https://www.googleapis.com/upload/drive/v3/files",
+      "get https://www.googleapis.com/drive/v3/files/tmp1/export",
+      "delete https://www.googleapis.com/drive/v3/files/tmp1",
+    ]);
+    expect(extractCandidates(a[1].text).length).toBeGreaterThan(0);
+    // Older exports (no attachments) still parse.
+    const old = parseInboxExport(
+      readFileSync("tests/fixtures/inbox-export.synthetic.json", "utf8"),
+    );
+    expect(old.items[0].attachments).toEqual([]);
+  });
+});
